@@ -55,8 +55,71 @@ impl HybridGrid {
         self.kd_tree
             .nearest_n_within::<SquaredEuclidean>(
                 &[center_point.x, center_point.y, center_point.z],
-                range.powi(2),
+                range,
                 NonZeroUsize::new(100).unwrap(), true,
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hybrid_grid_creation() {
+        let points = vec![
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+            Vector3::new(7.0, 8.0, 9.0),
+        ];
+        let filled_points: HashSet<HashableVector3> = points.into_iter().map(HashableVector3).collect();
+        let grid = HybridGrid::new(filled_points.clone());
+
+        assert_eq!(grid.filled_points.len(), filled_points.len());
+    }
+
+    #[test]
+    fn test_contains_point() {
+        let points = vec![
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+        ];
+        let filled_points: HashSet<HashableVector3> = points.into_iter().map(HashableVector3).collect();
+        let grid = HybridGrid::new(filled_points);
+
+        assert!(grid.contains(&Vector3::new(1.0, 2.0, 3.0)));
+        assert!(!grid.contains(&Vector3::new(7.0, 8.0, 9.0)));
+    }
+
+    #[test]
+    fn test_remove_point() {
+        let points = vec![
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+        ];
+        let mut filled_points: HashSet<HashableVector3> = points.into_iter().map(HashableVector3).collect();
+        let mut grid = HybridGrid::new(filled_points.clone());
+
+        grid.remove(&Vector3::new(1.0, 2.0, 3.0));
+
+        assert!(!grid.contains(&Vector3::new(1.0, 2.0, 3.0)));
+        assert!(grid.contains(&Vector3::new(4.0, 5.0, 6.0)));
+    }
+
+    #[test]
+    fn test_nearest_in_range() {
+        let points = vec![
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+            Vector3::new(7.0, 8.0, 9.0),
+        ];
+        let filled_points: HashSet<HashableVector3> = points.into_iter().map(HashableVector3).collect();
+        let grid = HybridGrid::new(filled_points);
+
+        let center = Vector3::new(2.0, 3.0, 4.0);
+        let nearest = grid.get_nearest_in_range(&center, 5.0);
+
+        assert_eq!(nearest.len(), 1);
+        assert!(nearest[0].distance < 5.0);
     }
 }
