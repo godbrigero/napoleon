@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 kiddo = "5.0.3"
 nalgebra = "0.33.2"
+splines = "4.4.2"
+plotters = "0.3.7"
