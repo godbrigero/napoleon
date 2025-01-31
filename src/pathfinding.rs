@@ -22,7 +22,7 @@ pub trait Pathfinding<'a> {
 /// Pathfinders that calculate the total cost of a given node time relative rather than aboslute pos position h, g cost.
 /// This might be slower, but it allows for more accurate pathfinding with a robot.
 pub trait TimedPathfinding<'a>: Pathfinding<'a> {
-    fn calculate_path(
+    fn calculate_path_timed(
         &self,
         start: Vector3<f64>,
         end: Vector3<f64>,
