@@ -5,3 +5,4 @@ use jni::JNIEnv;
 pub mod hybrid_grid;
 pub mod pathfinding;
 pub mod time_structures;
+pub mod trajectory_maker;
