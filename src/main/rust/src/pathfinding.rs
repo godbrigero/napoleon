@@ -16,7 +16,7 @@ pub trait Pathfinding<'a> {
         dynamic_objects: Vec<&'a DynamicObject>,
         filled_points: HashSet<HashableVector3>,
     ) -> Self;
-    fn calculate_path(&self, start: Vector3<f64>, end: Vector3<f64>) -> Vec<Vector3<f64>>;
+    fn calculate_path(&self, start: Vector3<i32>, end: Vector3<i32>) -> Option<Vec<Vector3<i32>>>;
 }
 
 /// Pathfinders that calculate the total cost of a given node time relative rather than aboslute pos position h, g cost.

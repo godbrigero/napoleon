@@ -1,0 +1,20 @@
+[package]
+name = "napoleon-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kiddo = "5.0.3"
+nalgebra = "0.33.2"
+splines = "4.4.2"
+plotters = "0.3.7"
+jni = "0.21"
+
+[lib]
+name = "napoleon_core"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "timed_path"
+path = "examples/timed_path.rs"

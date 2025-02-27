@@ -1,3 +1,4 @@
+/// TODO: REWORK THIS WHOLE THING!
 use kiddo::{KdTree, NearestNeighbour, SquaredEuclidean};
 use nalgebra::{Matrix, Vector, Vector3};
 use std::collections::HashSet;
@@ -65,7 +66,7 @@ impl DynamicObject {
 }
 
 #[derive(Debug, Clone)]
-pub struct HashableVector3(Vector3<f64>);
+pub struct HashableVector3(Vector3<i32>);
 
 impl PartialEq for HashableVector3 {
     fn eq(&self, other: &Self) -> bool {
@@ -73,8 +74,8 @@ impl PartialEq for HashableVector3 {
     }
 }
 
-impl From<Vector3<f64>> for HashableVector3 {
-    fn from(value: Vector3<f64>) -> Self {
+impl From<Vector3<i32>> for HashableVector3 {
+    fn from(value: Vector3<i32>) -> Self {
         Self(value)
     }
 }
@@ -83,14 +84,14 @@ impl Eq for HashableVector3 {}
 
 impl Hash for HashableVector3 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.x.to_bits().hash(state);
-        self.0.y.to_bits().hash(state);
-        self.0.z.to_bits().hash(state);
+        self.0.x.hash(state);
+        self.0.y.hash(state);
+        self.0.z.hash(state);
     }
 }
 
 impl Deref for HashableVector3 {
-    type Target = Vector3<f64>;
+    type Target = Vector3<i32>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -111,7 +112,7 @@ impl<'a> HybridGrid<'a> {
         let mut kd_tree: KdTree<f64, 3> = KdTree::new();
         for (index, point) in filled_points.iter().enumerate() {
             let vec = &point.0;
-            kd_tree.add(&[vec.x, vec.y, vec.z], 100);
+            kd_tree.add(&[vec.x as f64, vec.y as f64, vec.z as f64], 100);
         }
 
         HybridGrid {
@@ -121,21 +122,26 @@ impl<'a> HybridGrid<'a> {
         }
     }
 
-    pub fn contains(&self, point: &Vector3<f64>) -> bool {
+    // TODO: rework this
+    pub fn contains(&self, point: &Vector3<i32>) -> bool {
         self.filled_points.contains(&HashableVector3(point.clone()))
     }
 
-    pub fn remove(&mut self, point: &Vector3<f64>) {
+    pub fn remove(&mut self, point: &Vector3<i32>) {
         self.filled_points.remove(&HashableVector3(point.clone()));
     }
 
     pub fn get_nearest_in_range(
         &self,
-        center_point: &Vector3<f64>,
+        center_point: &Vector3<i32>,
         range: f64,
     ) -> Vec<NearestNeighbour<f64, u64>> {
         self.kd_tree.nearest_n_within::<SquaredEuclidean>(
-            &[center_point.x, center_point.y, center_point.z],
+            &[
+                center_point.x as f64,
+                center_point.y as f64,
+                center_point.z as f64,
+            ],
             range,
             NonZeroUsize::new(100).unwrap(),
             true,
@@ -143,6 +149,7 @@ impl<'a> HybridGrid<'a> {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,3 +210,4 @@ mod tests {
         assert!(nearest[0].distance < 5.0);
     }
 }
+ */

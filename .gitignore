@@ -1,2 +1,36 @@
-/target
+# Rust specific ignores
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Gradle specific ignores
+.gradle/
+build/
+out/
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# macOS specific ignores
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Project specific ignores
 plots/
+
+.venv/

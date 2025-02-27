@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.register('buildRust') {
+    doLast {
+        def rustDir = "$projectDir/src/main/rust"
+        def outputDir = "$projectDir/build/libs"
+        println "Building Rust library..."
+        exec {
+            workingDir rustDir
+            commandLine "cargo", "build", "--release"
+        }
+        copy {
+            from("$rustDir/target/release/")
+            include("*.so", "*.dll", "*.dylib")  // Shared libraries
+            into(outputDir)
+        }
+    }
+}
+
+tasks.named('build').configure {
+    dependsOn buildRust
+}
+
+jar {
+    from("$buildDir/libs") {
+        include("*.so", "*.dll", "*.dylib") // Ensure native library is in the JAR
+    }
+}

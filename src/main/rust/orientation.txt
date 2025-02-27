@@ -1,0 +1,9 @@
+UTIL FILE!
+
+Orientation:
+forward = +y
+backward = -y
+left = -x
+right = +x
+
+This orientation is used throughout napoleon.

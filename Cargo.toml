@@ -1,12 +1,21 @@
+[workspace]
+members = ["src/main/rust"]
+
 [package]
 name = "napoleon"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = []
+description = "A Rust project"
 
 [dependencies]
-kiddo = "5.0.3"
+napoleon-core = { path = "src/main/rust" }
 nalgebra = "0.33.2"
 splines = "4.4.2"
-plotters = "0.3.7"
+kiddo = "5.0.3"
+jni = "0.21"
+
+[lib]
+name = "napoleon"
+path = "src/main/rust/src/lib.rs"
+crate-type = ["cdylib"]
