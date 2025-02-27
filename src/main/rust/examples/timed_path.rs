@@ -1,13 +1,14 @@
-use nalgebra::Vector3;
-use napoleon_core::hybrid_grid::HashableVector3;
+use std::sync::Arc;
+
+use nalgebra::Vector2;
+use napoleon_core::hybrid_grid::{GenericDynamicObject, HybridGrid};
 use napoleon_core::pathfinding::a_star::AStar;
 use napoleon_core::pathfinding::Pathfinding;
 use plotters::prelude::*;
-use std::collections::HashSet;
 
 fn visualize_path(
-    filled_points: &HashSet<HashableVector3>,
-    path: &Option<Vec<Vector3<i32>>>,
+    grid: &HybridGrid<Arc<dyn GenericDynamicObject>>,
+    path: &Option<Vec<Vector2<i32>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create a drawing area
     let root = BitMapBackend::new("path_visualization.png", (800, 600)).into_drawing_area();
@@ -27,12 +28,14 @@ fn visualize_path(
     // Configure the chart
     chart.configure_mesh().draw()?;
 
-    // Draw obstacles
-    for point in filled_points {
+    // Draw obstacles (static objects from the grid)
+    for obstacle in grid.get_static_obstacles() {
+        let x = obstacle[0];
+        let y = obstacle[1];
         chart.draw_series(std::iter::once(Rectangle::new(
             [
-                (point.x as f64 - 0.4, point.y as f64 - 0.4),
-                (point.x as f64 + 0.4, point.y as f64 + 0.4),
+                (x as f64 - 0.4, y as f64 - 0.4),
+                (x as f64 + 0.4, y as f64 + 0.4),
             ],
             BLACK.filled(),
         )))?;
@@ -63,33 +66,29 @@ fn visualize_path(
 }
 
 fn main() {
-    // Create an empty set of dynamic objects (we won't use them for this simple example)
-    let dynamic_objects = Vec::new();
+    // Create a hybrid grid with some obstacles
+    let mut grid = HybridGrid::new(10, 6, 1.0, vec![]); // 10x6 grid
 
-    // Create a simple obstacle pattern in our grid
-    let mut filled_points = HashSet::new();
-
-    // Add some wall-like obstacles
+    // Add some static obstacles (walls)
     for y in 0..5 {
-        filled_points.insert(HashableVector3::from(Vector3::new(5, y, 0))); // Vertical wall
+        grid.push_static_obstacle(Vector2::new(5, y)); // Vertical wall
     }
-
     for x in 0..4 {
-        filled_points.insert(HashableVector3::from(Vector3::new(x, 3, 0))); // Horizontal wall
+        grid.push_static_obstacle(Vector2::new(x, 3)); // Horizontal wall
     }
 
     // Create our A* pathfinder
-    let pathfinder = AStar::new(dynamic_objects, filled_points.clone());
+    let pathfinder = AStar::new(grid.clone());
 
     // Define start and end points
-    let start = Vector3::new(0, 0, 0);
-    let end = Vector3::new(8, 4, 0);
+    let start = Vector2::new(0, 0);
+    let end = Vector2::new(8, 4);
 
     // Calculate the path
     let path = pathfinder.calculate_path(start, end);
 
     // Visualize the path
-    if let Err(e) = visualize_path(&filled_points, &path) {
+    if let Err(e) = visualize_path(&grid, &path) {
         eprintln!("Failed to create visualization: {}", e);
     }
 
@@ -99,7 +98,7 @@ fn main() {
             println!("Path found!");
             println!("Path points:");
             for (i, point) in path.iter().enumerate() {
-                println!("Step {}: ({}, {}, {})", i, point.x, point.y, point.z);
+                println!("Step {}: ({}, {})", i, point.x, point.y);
             }
         }
         None => println!("No path found!"),

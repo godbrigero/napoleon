@@ -665,6 +665,7 @@ dependencies = [
  "kiddo",
  "nalgebra",
  "napoleon-core",
+ "num-traits",
  "splines",
 ]
 
@@ -675,6 +676,7 @@ dependencies = [
  "jni",
  "kiddo",
  "nalgebra",
+ "num-traits",
  "plotters",
  "splines",
 ]

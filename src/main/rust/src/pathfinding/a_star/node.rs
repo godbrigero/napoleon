@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{Vector2, Vector3};
 use std::rc::Rc;
 
 pub enum NodePickStyle {
@@ -33,9 +33,10 @@ impl NodePickStyle {
 }
 
 pub struct Node {
-    position: Vector3<i32>,
+    position: Vector2<i32>,
     cost: f64,
     parent: Option<Rc<Node>>,
+    time_ms_since_initial: f64, // TODO: IMPLEMENT THIS
 }
 
 impl std::fmt::Display for Node {
@@ -49,15 +50,16 @@ impl std::fmt::Display for Node {
 }
 
 impl Node {
-    pub fn new(position: Vector3<i32>, parent: Option<Rc<Node>>) -> Self {
+    pub fn new(position: Vector2<i32>, parent: Option<Rc<Node>>) -> Self {
         Self {
             position,
             cost: 0.0,
             parent,
+            time_ms_since_initial: 0.0,
         }
     }
 
-    pub fn get_position(&self) -> Vector3<i32> {
+    pub fn get_position(&self) -> Vector2<i32> {
         return self.position;
     }
 
@@ -70,14 +72,14 @@ impl Node {
         let self_rc = Rc::new(Node::new(self.position, self.parent.clone()));
 
         for i in pick_style.get_offsets(step_size) {
-            return_vec.push(Node::new(self.position + i, Some(self_rc.clone())));
+            return_vec.push(Node::new(self.position + i.xy(), Some(self_rc.clone())));
         }
         return_vec
     }
 
     pub fn distance_to(&self, other: &Node) -> f64 {
         let diff = self.position - other.position;
-        ((diff.x as f64).powi(2) + (diff.y as f64).powi(2) + (diff.z as f64).powi(2)).sqrt()
+        ((diff.x as f64).powi(2) + (diff.y as f64).powi(2)).sqrt()
     }
 
     pub fn set_cost(&mut self, new_cost: f64) {

@@ -1,26 +1,21 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-use nalgebra::Vector3;
+use nalgebra::{Vector2, Vector3};
 
-use crate::hybrid_grid::{DynamicObject, HashableVector3, HybridGrid};
+use crate::hybrid_grid::{GenericDynamicObject, HybridGrid};
 
 use super::Pathfinding;
 
-pub struct RRTStar<'a> {
-    grid: HybridGrid<'a>,
+pub struct RRTStar {
+    grid: HybridGrid<Arc<dyn GenericDynamicObject>>,
 }
 
-impl<'a> Pathfinding<'a> for RRTStar<'a> {
-    fn new(
-        dynamic_objects: Vec<&'a DynamicObject>,
-        filled_points: HashSet<HashableVector3>,
-    ) -> Self {
-        Self {
-            grid: HybridGrid::new(filled_points, dynamic_objects),
-        }
+impl Pathfinding for RRTStar {
+    fn new(hybrid_grid: HybridGrid<Arc<dyn GenericDynamicObject>>) -> Self {
+        Self { grid: hybrid_grid }
     }
 
-    fn calculate_path(&self, start: Vector3<i32>, end: Vector3<i32>) -> Option<Vec<Vector3<i32>>> {
+    fn calculate_path(&self, start: Vector2<i32>, end: Vector2<i32>) -> Option<Vec<Vector2<i32>>> {
         todo!()
     }
 }
