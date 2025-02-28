@@ -67,7 +67,7 @@ fn visualize_path(
 
 fn main() {
     // Create a hybrid grid with some obstacles
-    let mut grid = HybridGrid::new(10, 6, 1.0, vec![]); // 10x6 grid
+    let mut grid = HybridGrid::new(10, 6, 1.0, vec![], 5, 3); // 10x6 grid
 
     // Add some static obstacles (walls)
     for y in 0..5 {

@@ -1,34 +1,140 @@
 plugins {
     id 'java'
+    id 'edu.wpi.first.wpilib.repositories.WPILibRepositoriesPlugin' version '2025.0'
+    id 'edu.wpi.first.GradleVsCode' version '2.1.0'
+    id 'jacoco'
+}
+
+apply plugin: 'application'
+
+application {
+    mainClass = "org.pwrup.napoleon.Main" // Change this to your actual main class
+}
+
+ext.wpilibVersion = "2025.+"
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
     mavenCentral()
+    maven { url "https://frcmaven.wpi.edu/artifactory/release/" }
+}
+
+dependencies {
+    implementation "edu.wpi.first.cscore:cscore-java:$wpilibVersion"
+    implementation "edu.wpi.first.cameraserver:cameraserver-java:$wpilibVersion"
+    implementation "edu.wpi.first.ntcore:ntcore-java:$wpilibVersion"
+    implementation "edu.wpi.first.wpilibj:wpilibj-java:$wpilibVersion"
+    implementation "edu.wpi.first.wpiutil:wpiutil-java:$wpilibVersion"
+    implementation "edu.wpi.first.wpimath:wpimath-java:$wpilibVersion"
+    implementation "edu.wpi.first.wpiunits:wpiunits-java:$wpilibVersion"
+    implementation "edu.wpi.first.hal:hal-java:$wpilibVersion"
+    implementation "edu.wpi.first.wpilibNewCommands:wpilibNewCommands-java:$wpilibVersion"
+    implementation "org.ejml:ejml-simple:0.43.1"
+    implementation "com.fasterxml.jackson.core:jackson-annotations:2.15.2"
+    implementation "com.fasterxml.jackson.core:jackson-core:2.15.2"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+    implementation 'edu.wpi.first.thirdparty.frc2025.opencv:opencv-java:4.10.0-2'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
 }
 
 tasks.register('buildRust') {
     doLast {
         def rustDir = "$projectDir/src/main/rust"
-        def outputDir = "$projectDir/build/libs"
+        def releaseDir = "target/release"
+        def outputDir = file("$buildDir/native-libs")  // Ensure directory exists
+        outputDir.mkdirs()
+
         println "Building Rust library..."
         exec {
             workingDir rustDir
             commandLine "cargo", "build", "--release"
         }
+
+        println "Looking for built Rust shared libraries in: $releaseDir"
+        def rustFiles = fileTree(releaseDir).matching {
+            include("libnapoleon_core.so", "libnapoleon_core.dylib", "napoleon_core.dll")
+        }
+
+        if (rustFiles.isEmpty()) {
+            throw new GradleException("Rust shared library not found! Check if Cargo built it correctly.")
+        }
+
+        println "Found Rust libraries: " + rustFiles.files
         copy {
-            from("$rustDir/target/release/")
-            include("*.so", "*.dll", "*.dylib")  // Shared libraries
-            into(outputDir)
+            from rustFiles
+            into outputDir
+        }
+
+        println "Rust build complete. Files in $outputDir:"
+        fileTree(outputDir).visit { println it.file }
+    }
+}
+
+// Task to build dynamically from external repositories
+tasks.register("buildDynamically") {
+    group = "custom"
+    description = "Build dependencies dynamically using the configuration file"
+
+    doLast {
+        def configFilePath = "./config.ini"
+        exec {
+            commandLine "python3", "scripts/clone_and_build_repos.py", "--config-file-path", configFilePath
         }
     }
 }
 
-tasks.named('build').configure {
-    dependsOn buildRust
+// Collect dynamically built JAR files **before the JAR task runs**
+def dynamicJars = fileTree(dir: "lib/build", include: "*.jar")
+
+dependencies {
+    implementation files(dynamicJars)  // Directly include dynamic JARs
 }
 
+// Ensure Rust and dynamic builds run before JAR
+tasks.named('build').configure {
+    dependsOn buildRust, buildDynamically
+}
+
+// Modify the jar task to include both Rust libraries and dynamically built JARs
 jar {
-    from("$buildDir/libs") {
-        include("*.so", "*.dll", "*.dylib") // Ensure native library is in the JAR
+    dependsOn buildRust, buildDynamically  // Ensure Rust & dynamic dependencies are built before packaging
+
+    from("$buildDir/native-libs") {
+        include("*.so", "*.dll", "*.dylib")  // Ensure native library is in the JAR
+        into("native") // Store in "native" folder inside the JAR
     }
+
+    from("lib/build") {
+        include("*.jar")  // Include dynamically built dependencies inside the JAR
+        into("libs")
+    }
+
+    manifest {
+        attributes(
+            "Main-Class": application.mainClass 
+        )
+    }
+}
+
+tasks.register('runJar', JavaExec) {
+    dependsOn build // Ensure the JAR is built first
+    group = "application"
+    description = "Builds and runs the compiled JAR."
+
+    // Find the compiled JAR
+    def jarFile = file("$buildDir/libs/${project.name}.jar")
+
+    if (!jarFile.exists()) {
+        throw new GradleException("JAR file not found! Run `./gradlew build` first.")
+    }
+
+    println "Running JAR: ${jarFile}"
+
+    mainClass = "org.pwrup.napoleon.Main" // Change to your main class
+    classpath = files(jarFile)
+    args = [] // Add any command-line arguments here if needed
 }

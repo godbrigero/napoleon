@@ -32,7 +32,6 @@ impl Pathfinding for AStar {
 
     fn calculate_path(&self, start: Vector2<i32>, end: Vector2<i32>) -> Option<Vec<Vector2<i32>>> {
         let end_node = Node::new(end, None);
-        let mut cur = 0;
 
         let mut open_set = BinaryHeap::new();
         let mut closed_set: HashSet<Vector2<i32>> = HashSet::new();
@@ -58,9 +57,6 @@ impl Pathfinding for AStar {
                     continue;
                 }
 
-                let dynamic_object_list =
-                    self.grid.get_dynamic_object_transformation_matrices_at(0.0);
-
                 let tentative_g_cost = *g_scores.get(&current.get_position()).unwrap()
                     + current.distance_to(&neighbor);
                 let neighbor_g_cost = g_scores
@@ -74,8 +70,6 @@ impl Pathfinding for AStar {
                     open_set.push(neighbor);
                 }
             }
-
-            cur += 1;
         }
 
         None

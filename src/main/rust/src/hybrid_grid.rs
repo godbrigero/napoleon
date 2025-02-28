@@ -60,12 +60,13 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
         size_x: i32,
         size_y: i32,
         square_size_meters: f32,
-        static_obstacles: Vec<Vec<i32>>,
+        static_obstacles: Vec<Vector2<i32>>,
+        center_x: i32,
+        center_y: i32,
     ) -> Self {
-        let mut grid = Self::new_raw(size_x, size_y, square_size_meters, size_x / 2, size_y / 2);
+        let mut grid = Self::new_raw(size_x, size_y, square_size_meters, center_x, center_y);
 
         for obstacle in static_obstacles {
-            let obstacle = Vector2::new(obstacle[0], obstacle[1]);
             if !grid.is_outside_grid(obstacle) {
                 grid.push_static_obstacle(obstacle);
             }
