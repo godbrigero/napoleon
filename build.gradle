@@ -80,7 +80,7 @@ tasks.register("buildDynamically") {
     description = "Build dependencies dynamically using the configuration file"
 
     doLast {
-        def configFilePath = "./config.ini"
+        def configFilePath = "./build-config.ini"
         exec {
             commandLine "python3", "scripts/clone_and_build_repos.py", "--config-file-path", configFilePath
         }
