@@ -34,3 +34,6 @@ out/
 plots/
 
 .venv/
+
+lib/vendor/
+lib/bin/
