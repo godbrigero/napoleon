@@ -7,23 +7,43 @@ import java.nio.file.StandardCopyOption;
 
 public class AStarPathfinder {
   static {
-    try {
-      // Map the correct library name
-      String libName = System.mapLibraryName("napoleon_core"); // Not "napoleon"!
-
-      // Extract from JAR to a temp file
-      InputStream in = AStarPathfinder.class.getResourceAsStream("/native/" + libName);
-      if (in == null)
-        throw new RuntimeException("Native library not found in JAR!");
-
-      File tempFile = File.createTempFile(libName, "");
-      Files.copy(in, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-      System.load(tempFile.getAbsolutePath());
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to load Rust native library", e);
-    }
+    NativeLoader.init();
   }
 
-  public native int[] calculate(int[] static_obstacles, int[] size_x_y, int[] center_x_y, float square_size_meters,
-      float[] robot_avg_velocity_x_m_s, int[] start_x_y, int[] end_x_y, float[] finder_relative_w_h);
+  private HybridGrid hybridGrid;
+
+  public AStarPathfinder(
+    HybridGrid hybridGrid,
+    NodePickStyle nodePickStyle,
+    int maxNodesInRange,
+    float finderRelativeW,
+    float finderRelativeH
+  ) {
+    this.hybridGrid = hybridGrid;
+    this.initialize(
+        hybridGrid.getStaticObstacles(),
+        new int[] { hybridGrid.getWidthX(), hybridGrid.getWidthY() },
+        new int[] { hybridGrid.getCenterX(), hybridGrid.getCenterY() },
+        hybridGrid.getSqSizeMeters(),
+        nodePickStyle.getValue(),
+        maxNodesInRange,
+        new float[] { finderRelativeW, finderRelativeH }
+      );
+  }
+
+  private native void initialize(
+    int[] static_obstacles,
+    int[] size_x_y,
+    int[] center_x_y,
+    float square_size_meters,
+    int node_pick_style,
+    int max_nodes_in_range,
+    float[] finder_relative_w_h
+  );
+
+  public native int[] calculate(int[] start_x_y, int[] end_x_y);
+
+  public native void clearHybridObjects();
+
+  public native void addHybridObjects(float[] objects);
 }

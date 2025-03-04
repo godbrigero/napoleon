@@ -39,6 +39,9 @@ dependencies {
     implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
     implementation 'edu.wpi.first.thirdparty.frc2025.opencv:opencv-java:4.10.0-2'
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.ejml:ejml-all:0.42'
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
 }
 
 tasks.register('buildRust') {
