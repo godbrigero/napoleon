@@ -1,10 +1,12 @@
 package org.pwrup.napoleon.bridge;
 
 import java.io.FileReader;
-import lombok.Getter;
+
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+
+import lombok.Getter;
 
 @Getter
 public class HybridGrid {
@@ -15,13 +17,12 @@ public class HybridGrid {
   private int[] staticObstacles;
 
   public HybridGrid(
-    int widthX,
-    int widthY,
-    int centerX,
-    int centerY,
-    float sqSizeMeters,
-    int[][] defaultStaticObstacles
-  ) {
+      int widthX,
+      int widthY,
+      int centerX,
+      int centerY,
+      float sqSizeMeters,
+      int[][] defaultStaticObstacles) {
     this.widthX = widthX;
     this.widthY = widthY;
     this.centerX = centerX;
@@ -44,10 +45,12 @@ public class HybridGrid {
       JSONParser parser = new JSONParser();
       JSONObject json = (JSONObject) parser.parse(new FileReader(fileName));
 
-      this.sqSizeMeters =
-        ((Number) json.get("square_size_meters")).floatValue();
+      this.sqSizeMeters = ((Number) json.get("square_size_meters")).floatValue();
       this.widthX = ((Number) json.get("grid_width_squares")).intValue();
       this.widthY = ((Number) json.get("grid_height_squares")).intValue();
+
+      // this.centerXM = (double) ((JSONArray) json.get("center_position_meters")).get(0);
+      // this.centerYM = (double) ((JSONArray) json.get("center_position_meters")).get(1);
 
       this.centerX = this.widthX / 2;
       this.centerY = this.widthY / 2;
@@ -62,9 +65,8 @@ public class HybridGrid {
       }
     } catch (Exception e) {
       throw new RuntimeException(
-        "Failed to load grid configuration from file: " + fileName,
-        e
-      );
+          "Failed to load grid configuration from file: " + fileName,
+          e);
     }
   }
 }

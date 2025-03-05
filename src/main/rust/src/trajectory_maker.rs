@@ -1,5 +1,3 @@
-use j4rs::errors::J4RsError;
-use j4rs::{Instance, InvocationArg, JavaClass, Jvm, JvmBuilder};
 use jni::objects::{JClass, JString};
 use jni::objects::{JObject, JValue};
 use jni::sys::jdoubleArray;
@@ -31,6 +29,7 @@ impl Pose2d {
     }
 }
 
+/*
 pub struct TrajectoryMaker {
     instance: Instance,
     transformations: Vec<Pose2d>,
@@ -88,3 +87,4 @@ impl TrajectoryMaker {
 pub fn to_java_list(jvm: Jvm, basic_types: Vec<f64>) -> Result<Instance, J4RsError> {
     jvm.java_list(JavaClass::Double, basic_types)
 }
+     */

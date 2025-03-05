@@ -47,8 +47,8 @@ dependencies {
 tasks.register('buildRust') {
     doLast {
         def rustDir = "$projectDir/src/main/rust"
-        def releaseDir = "target/release"
-        def outputDir = file("$buildDir/native-libs")  // Ensure directory exists
+        def releaseDir = "target/arm-unknown-linux-gnueabi/release"  // Updated path for cross-compiled output
+        def outputDir = file("$buildDir/native-libs")
         outputDir.mkdirs()
 
         println "Building Rust library..."
@@ -104,21 +104,21 @@ tasks.named('build').configure {
 
 // Modify the jar task to include both Rust libraries and dynamically built JARs
 jar {
-    dependsOn buildRust, buildDynamically  // Ensure Rust & dynamic dependencies are built before packaging
+    dependsOn buildRust, buildDynamically
 
     from("$buildDir/native-libs") {
-        include("*.so", "*.dll", "*.dylib")  // Ensure native library is in the JAR
+        include("*.so", "*.dll", "*.dylib")
         into("native") // Store in "native" folder inside the JAR
     }
 
     from("lib/build") {
-        include("*.jar")  // Include dynamically built dependencies inside the JAR
+        include("*.jar")
         into("libs")
     }
 
     manifest {
         attributes(
-            "Main-Class": application.mainClass 
+            "Main-Class": application.mainClass
         )
     }
 }

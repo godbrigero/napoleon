@@ -1,4 +1,8 @@
-use std::{collections::HashSet, num::NonZero, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZero,
+    sync::Arc,
+};
 
 use kiddo::{KdTree, NearestNeighbour};
 use nalgebra::{Matrix3, Vector2, Vector3};
@@ -24,6 +28,13 @@ impl GenericDynamicObject for Arc<dyn GenericDynamicObject> {
 }
 
 #[derive(Clone)]
+pub struct UncertentyField {
+    pub center: Vector2<f32>,
+    pub radius: f32,
+    pub intensity: f32,
+}
+
+#[derive(Clone)]
 pub struct HybridGrid<D>
 where
     D: GenericDynamicObject + Clone,
@@ -37,6 +48,10 @@ where
     static_obstacles: HashSet<Vector2<i32>>,
     hybrid_obstacles: KdTree<f32, 2>,
     dynamic_objects: Vec<D>,
+
+    uncertenty_defs: HashMap<u64, UncertentyField>,
+    uncertenty_fields: KdTree<f32, 2>,
+    max_field_radius: f32,
 }
 
 impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
@@ -56,6 +71,9 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
             static_obstacles: HashSet::new(),
             dynamic_objects: Vec::new(),
             hybrid_obstacles: KdTree::new(),
+            uncertenty_defs: HashMap::new(),
+            uncertenty_fields: KdTree::new(),
+            max_field_radius: 0.0,
         }
     }
 
@@ -155,5 +173,37 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
         }
 
         false
+    }
+
+    pub fn add_uncertenty_field(&mut self, center: Vector2<f32>, radius: f32, intensity: f32) {
+        let position = (self.uncertenty_defs.len() + 1) as u64;
+        if radius > self.max_field_radius {
+            self.max_field_radius = radius;
+        }
+
+        self.uncertenty_fields
+            .add(&[center.x as f32, center.y as f32], position);
+        self.uncertenty_defs.insert(
+            position,
+            UncertentyField {
+                center,
+                radius,
+                intensity,
+            },
+        );
+    }
+
+    pub fn clear_uncertenty_fields(&mut self) {
+        self.uncertenty_defs.clear();
+        self.uncertenty_fields = KdTree::new();
+    }
+
+    // TODO: what if no fields were found...?
+    pub fn get_uncertenty_field(&self, position: Vector2<f32>) -> Option<UncertentyField> {
+        let output = self
+            .uncertenty_fields
+            .nearest_one::<kiddo::SquaredEuclidean>(&[position.x as f32, position.y as f32]);
+
+        return self.uncertenty_defs.get(&output.item).cloned();
     }
 }

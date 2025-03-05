@@ -5,7 +5,6 @@ members = ["src/main/rust"]
 name = "napoleon"
 version = "0.1.0"
 edition = "2021"
-authors = []
 description = "A Rust project"
 
 [dependencies]
@@ -16,7 +15,6 @@ kiddo = "5.0.3"
 jni = "0.21"
 num-traits = "0.2.19"
 jni-utils = "0.1.1"
-j4rs = "0.22.0"
 lazy_static = "1.4.0"
 threadpool = "1.8.1"
 

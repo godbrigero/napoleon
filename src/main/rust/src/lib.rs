@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use hybrid_grid::{GenericDynamicObject, HybridGrid};
-use j4rs::jni_sys::{jfloat, jfloatArray, jint, jintArray};
 use jni::{
     objects::{JClass, JFloatArray, JIntArray},
+    sys::{jfloat, jint},
     JNIEnv,
 };
 use nalgebra::Vector2;
@@ -85,6 +85,31 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_clearHybridObje
     let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
     let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
     hybrid_grid.clear_hybrid_objects();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_clearUncertentyFields<'a>(
+    env: JNIEnv<'a>,
+    _: JClass<'a>,
+) {
+    let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
+    let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
+    hybrid_grid.clear_uncertenty_fields();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_addUncertentyField<'a>(
+    env: JNIEnv<'a>,
+    _: JClass<'a>,
+    center: JFloatArray<'a>,
+    radius: jfloat,
+    intensity: jfloat,
+) {
+    let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
+    let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
+    let field_center: Vector2<f32> =
+        jni_util_extended::from_jfloat_array_to_vector2_float(&env, center);
+    hybrid_grid.add_uncertenty_field(field_center, radius, intensity);
 }
 
 #[no_mangle]

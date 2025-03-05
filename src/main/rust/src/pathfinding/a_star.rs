@@ -45,7 +45,8 @@ impl Pathfinding for AStar {
                 return Some(self.reconstruct_path(current));
             }
 
-            closed_set.remove(&current.get_position());
+            let position = current.get_position();
+            closed_set.remove(&position);
 
             for mut neighbor in current.get_positions_around(&self.pick_style, self.node_step_size)
             {
@@ -75,7 +76,7 @@ impl Pathfinding for AStar {
                     }
                 }
 
-                let g_score = *g_scores.get(&current.get_position()).unwrap_or(&f64::MIN);
+                let g_score = *g_scores.get(&position).unwrap_or(&f64::MIN);
                 let tentative_g_cost = g_score + current.distance_to(&neighbor);
                 let neighbor_g_cost = g_scores
                     .get(&neighbor.get_position())
@@ -83,7 +84,17 @@ impl Pathfinding for AStar {
                     .unwrap_or(f64::INFINITY);
 
                 if tentative_g_cost < neighbor_g_cost {
-                    neighbor.set_cost(tentative_g_cost + end_node.distance_to(&neighbor));
+                    let extra_cost = if let Some(field) = grid
+                        .get_uncertenty_field(Vector2::new(position.x as f32, position.y as f32))
+                    {
+                        field.intensity
+                    } else {
+                        0.0
+                    };
+
+                    neighbor.set_cost(
+                        tentative_g_cost + end_node.distance_to(&neighbor) + extra_cost as f64,
+                    );
                     g_scores.insert(neighbor.get_position(), tentative_g_cost);
                     open_set.push(neighbor);
                 }
