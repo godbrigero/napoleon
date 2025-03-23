@@ -2,7 +2,7 @@ use super::{NodeRadiusSearch, Pathfinding};
 use crate::hybrid_grid::HybridGrid;
 use core::f64;
 use kiddo::NearestNeighbour;
-use nalgebra::Vector2;
+use nalgebra::{distance, Vector2};
 use node::{Node, NodePickStyle};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
@@ -17,6 +17,10 @@ fn average_distance(nodes: &Vec<f32>) -> f32 {
     nodes.iter().sum::<f32>() / nodes.len() as f32
 }
 
+fn get_distance_squared(node: &Vector2<i32>, other: &Vector2<i32>) -> f32 {
+    return (node.x as f32 - other.x as f32).powi(2) + (node.y as f32 - other.y as f32).powi(2);
+}
+
 pub struct AStar {
     grid: HybridGrid,
     pick_style: NodePickStyle,
@@ -29,7 +33,7 @@ impl Pathfinding for AStar {
             grid: hybrid_grid,
             pick_style: NodePickStyle::ALL,
             node_radius_search_config: NodeRadiusSearch {
-                node_radius_search_radius: 1.0,
+                node_radius_search_radius_squared: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 1.0,
                 avg_distance_cost: 1.0,
@@ -44,16 +48,21 @@ impl Pathfinding for AStar {
         let mut g_scores = HashMap::new();
 
         open_set.push(Node::new(start, None));
-        closed_set.insert(start);
         g_scores.insert(start, 0.0);
 
         while let Some(current) = open_set.pop() {
-            if current.get_position() == end_node.get_position() {
+            let position = current.get_position();
+
+            if closed_set.contains(&position) {
+                continue;
+            }
+
+            if position == end_node.get_position() {
+                println!("Found path {:?}", closed_set.len());
                 return Some(self.reconstruct_path(current));
             }
 
-            let position = current.get_position();
-            closed_set.remove(&position);
+            closed_set.insert(position);
 
             for mut neighbor in current.get_positions_around(&self.pick_style) {
                 if closed_set.contains(&neighbor.get_position())
@@ -63,17 +72,23 @@ impl Pathfinding for AStar {
                     continue;
                 }
 
-                let all_nodes_in_radius = self.grid.get_all_obstructions_in_radius(
+                let static_nodes_in_radius = self.grid.get_all_obstructions_in_radius(
                     neighbor.get_position(),
-                    self.node_radius_search_config.node_radius_search_radius as i32,
+                    self.node_radius_search_config
+                        .node_radius_search_radius_squared as i32,
                 );
-                let avg_distance = average_distance(
-                    &all_nodes_in_radius
-                        .iter()
-                        .map(|node| node.x as f32)
-                        .collect::<Vec<f32>>(),
+                let hybrid_nodes_in_radius = self.grid.get_nearest(
+                    neighbor.get_position(),
+                    self.node_radius_search_config
+                        .node_radius_search_radius_squared as f32,
                 );
+                let mut all_distances = static_nodes_in_radius
+                    .iter()
+                    .map(|node| get_distance_squared(&neighbor.get_position(), &node))
+                    .collect::<Vec<f32>>();
+                all_distances.extend(hybrid_nodes_in_radius.iter().map(|node| node.distance));
 
+                let avg_distance = average_distance(&all_distances);
                 if neighbor.get_position() != end_node.get_position() {
                     if self.node_radius_search_config.do_absolute_discard
                         && avg_distance != 0.0
@@ -200,7 +215,7 @@ mod tests {
             grid,
             NodePickStyle::SIDES,
             NodeRadiusSearch {
-                node_radius_search_radius: 2.0,
+                node_radius_search_radius_squared: 2.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 2.0,
@@ -243,7 +258,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius: 1.0,
+                node_radius_search_radius_squared: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 2.0,
@@ -277,7 +292,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius: 1.0,
+                node_radius_search_radius_squared: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 2.0,
@@ -298,7 +313,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius: 2.0,
+                node_radius_search_radius_squared: 2.0,
                 do_absolute_discard: true,
                 avg_distance_min_discard_threshold: 1.0,
                 avg_distance_cost: 2.0,
@@ -319,7 +334,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius: 1.0,
+                node_radius_search_radius_squared: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 1.0,

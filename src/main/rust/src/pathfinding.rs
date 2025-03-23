@@ -6,7 +6,7 @@ pub mod a_star;
 pub mod rrt_star;
 
 pub struct NodeRadiusSearch {
-    pub node_radius_search_radius: f32,
+    pub node_radius_search_radius_squared: f32,
 
     pub do_absolute_discard: bool,
     pub avg_distance_min_discard_threshold: f32,

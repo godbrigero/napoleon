@@ -166,7 +166,7 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_initialize
         hybrid_grid,
         node_pick_style,
         NodeRadiusSearch {
-            node_radius_search_radius: distance,
+            node_radius_search_radius_squared: distance * distance,
             do_absolute_discard: do_absolute_discard != 0,
             avg_distance_min_discard_threshold: avg_distance_min_discard_threshold as f32,
             avg_distance_cost: avg_distance_cost as f32,
