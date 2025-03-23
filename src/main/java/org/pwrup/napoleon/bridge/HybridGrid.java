@@ -1,12 +1,10 @@
 package org.pwrup.napoleon.bridge;
 
 import java.io.FileReader;
-
+import lombok.Getter;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-
-import lombok.Getter;
 
 @Getter
 public class HybridGrid {
@@ -17,12 +15,13 @@ public class HybridGrid {
   private int[] staticObstacles;
 
   public HybridGrid(
-      int widthX,
-      int widthY,
-      int centerX,
-      int centerY,
-      float sqSizeMeters,
-      int[][] defaultStaticObstacles) {
+    int widthX,
+    int widthY,
+    int centerX,
+    int centerY,
+    float sqSizeMeters,
+    int[][] defaultStaticObstacles
+  ) {
     this.widthX = widthX;
     this.widthY = widthY;
     this.centerX = centerX;
@@ -45,28 +44,29 @@ public class HybridGrid {
       JSONParser parser = new JSONParser();
       JSONObject json = (JSONObject) parser.parse(new FileReader(fileName));
 
-      this.sqSizeMeters = ((Number) json.get("square_size_meters")).floatValue();
-      this.widthX = ((Number) json.get("grid_width_squares")).intValue();
-      this.widthY = ((Number) json.get("grid_height_squares")).intValue();
-
-      // this.centerXM = (double) ((JSONArray) json.get("center_position_meters")).get(0);
-      // this.centerYM = (double) ((JSONArray) json.get("center_position_meters")).get(1);
+      this.sqSizeMeters =
+        ((Number) json.get("square_size_meters")).floatValue();
+      int gridSize = ((Number) json.get("grid_size_pixels")).intValue();
+      this.widthX = gridSize;
+      this.widthY = gridSize;
 
       this.centerX = this.widthX / 2;
       this.centerY = this.widthY / 2;
 
-      JSONArray walls = (JSONArray) json.get("walls");
-      this.staticObstacles = new int[walls.size() * 2];
+      JSONArray obstacles = (JSONArray) json.get("obstacles");
+      this.staticObstacles = new int[obstacles.size() * 2];
 
-      for (int i = 0; i < walls.size(); i++) {
-        JSONArray wall = (JSONArray) walls.get(i);
-        this.staticObstacles[i * 2] = ((Number) wall.get(0)).intValue();
-        this.staticObstacles[i * 2 + 1] = ((Number) wall.get(1)).intValue();
+      for (int i = 0; i < obstacles.size(); i++) {
+        JSONObject obstacle = (JSONObject) obstacles.get(i);
+        this.staticObstacles[i * 2] = ((Number) obstacle.get("x")).intValue();
+        this.staticObstacles[i * 2 + 1] =
+          ((Number) obstacle.get("y")).intValue();
       }
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed to load grid configuration from file: " + fileName,
-          e);
+        "Failed to load grid configuration from file: " + fileName,
+        e
+      );
     }
   }
 }

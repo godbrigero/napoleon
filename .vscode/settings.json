@@ -1,4 +1,9 @@
 {
   "java.configuration.updateBuildConfiguration": "automatic",
-  "python.analysis.typeCheckingMode": "basic"
+
+  // Run code actions on save
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "always",
+    "source.fixAll": "always"
+  }
 }

@@ -1,17 +1,15 @@
-use std::{collections::HashSet, sync::Arc};
+use nalgebra::Vector2;
 
-use nalgebra::{Vector2, Vector3};
-
-use crate::hybrid_grid::{GenericDynamicObject, HybridGrid};
+use crate::hybrid_grid::HybridGrid;
 
 use super::Pathfinding;
 
 pub struct RRTStar {
-    grid: HybridGrid<Arc<dyn GenericDynamicObject>>,
+    grid: HybridGrid,
 }
 
 impl Pathfinding for RRTStar {
-    fn new(hybrid_grid: HybridGrid<Arc<dyn GenericDynamicObject>>) -> Self {
+    fn new(hybrid_grid: HybridGrid) -> Self {
         Self { grid: hybrid_grid }
     }
 

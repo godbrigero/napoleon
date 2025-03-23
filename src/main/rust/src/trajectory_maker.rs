@@ -1,8 +1,4 @@
-use jni::objects::{JClass, JString};
-use jni::objects::{JObject, JValue};
-use jni::sys::jdoubleArray;
-use jni::JNIEnv;
-use nalgebra::{Matrix3, Point2, Rotation2, Transform2, Translation2};
+use nalgebra::{Rotation2, Translation2};
 
 pub struct Pose2d {
     translation: Translation2<f64>,

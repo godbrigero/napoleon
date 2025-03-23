@@ -47,33 +47,48 @@ dependencies {
 tasks.register('buildRust') {
     doLast {
         def rustDir = "$projectDir/src/main/rust"
-        def releaseDir = "target/arm-unknown-linux-gnueabi/release"  // Updated path for cross-compiled output
+        def linuxReleaseDir = "target/arm-unknown-linux-gnueabi/release"
+        def macReleaseDir = "target/release"
         def outputDir = file("$buildDir/native-libs")
         outputDir.mkdirs()
 
-        println "Building Rust library..."
+        println "Building Rust library for Linux..."
+        exec {
+            workingDir rustDir
+            commandLine "cargo", "build", "--release", "--target", "arm-unknown-linux-gnueabi"
+        }
+
+        println "Building Rust library for macOS..."
         exec {
             workingDir rustDir
             commandLine "cargo", "build", "--release"
         }
 
-        println "Looking for built Rust shared libraries in: $releaseDir"
-        def rustFiles = fileTree(releaseDir).matching {
-            include("libnapoleon_core.so", "libnapoleon_core.dylib", "napoleon_core.dll")
+        println "Looking for built Rust shared libraries..."
+        def linuxFiles = fileTree(linuxReleaseDir).matching {
+            include("libnapoleon_core.so")
+        }
+        def macFiles = fileTree(macReleaseDir).matching {
+            include("libnapoleon_core.dylib")
         }
 
-        if (rustFiles.isEmpty()) {
-            throw new GradleException("Rust shared library not found! Check if Cargo built it correctly.")
+        if (linuxFiles.isEmpty() && macFiles.isEmpty()) {
+            throw new GradleException("No Rust shared libraries found! Check if Cargo built them correctly.")
         }
 
-        println "Found Rust libraries: " + rustFiles.files
+        println "Found Linux libraries: " + linuxFiles.files
+        println "Found macOS libraries: " + macFiles.files
+
+        // Copy to build directory
         copy {
-            from rustFiles
+            from linuxFiles
             into outputDir
         }
 
-        println "Rust build complete. Files in $outputDir:"
-        fileTree(outputDir).visit { println it.file }
+        copy {
+            from macFiles
+            into outputDir
+        }
     }
 }
 
@@ -106,9 +121,20 @@ tasks.named('build').configure {
 jar {
     dependsOn buildRust, buildDynamically
 
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    // Include native libraries from both build directory and resources
     from("$buildDir/native-libs") {
         include("*.so", "*.dll", "*.dylib")
-        into("native") // Store in "native" folder inside the JAR
+        into("native")
+    }
+
+    from("src/main/resources/native") {
+        include("*.so", "*.dll", "*.dylib")
+        into("native")
     }
 
     from("lib/build") {

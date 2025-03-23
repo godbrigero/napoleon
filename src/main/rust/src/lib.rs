@@ -1,15 +1,13 @@
-use std::sync::{Arc, Mutex};
-
-use hybrid_grid::{GenericDynamicObject, HybridGrid};
+use hybrid_grid::HybridGrid;
 use jni::{
     objects::{JClass, JFloatArray, JIntArray},
-    sys::{jfloat, jint},
+    sys::{jfloat, jint, jlong},
     JNIEnv,
 };
 use nalgebra::Vector2;
 use pathfinding::{
     a_star::{node::NodePickStyle, AStar},
-    Pathfinding,
+    NodeRadiusSearch, Pathfinding,
 };
 
 pub mod hybrid_grid;
@@ -18,26 +16,30 @@ pub mod pathfinding;
 pub mod time_structures;
 pub mod trajectory_maker;
 
-lazy_static::lazy_static! {
-    static ref STORED_RUST_INSTANCE: Mutex<Option<AStar>> = Mutex::new(None);
+fn get_astar<'a>(env: &mut JNIEnv<'a>, obj: JClass<'a>) -> &'a mut AStar {
+    let ptr = env
+        .get_field(obj, "nativePtr", "J")
+        .expect("Field not found")
+        .j()
+        .unwrap();
+
+    let astar = unsafe { &mut *(ptr as *mut AStar) };
+    astar
 }
 
 #[no_mangle]
 pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_calculate<'a>(
-    env: JNIEnv<'a>,
-    _: JClass<'a>,
+    mut env: JNIEnv<'a>,
+    obj: JClass<'a>,
     start_x_y: JIntArray<'a>,
     end_x_y: JIntArray<'a>,
 ) -> JIntArray<'a> {
     let start = jni_util_extended::from_jint_array_to_vector2_int(&env, start_x_y);
     let end = jni_util_extended::from_jint_array_to_vector2_int(&env, end_x_y);
 
-    let stored_instance = STORED_RUST_INSTANCE.lock().unwrap();
-    let stored_instance = stored_instance
-        .as_ref()
-        .expect("You have not yet initialized the pathfinder!");
+    let astar = get_astar(&mut env, obj);
 
-    let path = stored_instance.calculate_path(start, end);
+    let path = astar.calculate_path(start, end);
     if path.is_none() {
         return env
             .new_int_array(0)
@@ -63,13 +65,13 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_calculate<
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_addHybridObjects<'a>(
-    env: JNIEnv<'a>,
-    _: JClass<'a>,
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_addHybridObjects<'a>(
+    mut env: JNIEnv<'a>,
+    obj: JClass<'a>,
     objects: JFloatArray<'a>,
 ) {
-    let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
-    let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
+    let astar = get_astar(&mut env, obj);
+    let hybrid_grid = astar.get_grid();
 
     let objects = jni_util_extended::jfloatarray_to_vec(&env, objects);
     for i in (0..objects.len()).step_by(2) {
@@ -78,35 +80,35 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_addHybridObject
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_clearHybridObjects<'a>(
-    env: JNIEnv<'a>,
-    _: JClass<'a>,
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_clearHybridObjects<'a>(
+    mut env: JNIEnv<'a>,
+    obj: JClass<'a>,
 ) {
-    let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
-    let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
+    let astar = get_astar(&mut env, obj);
+    let hybrid_grid = astar.get_grid();
     hybrid_grid.clear_hybrid_objects();
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_clearUncertentyFields<'a>(
-    env: JNIEnv<'a>,
-    _: JClass<'a>,
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_clearUncertentyFields<'a>(
+    mut env: JNIEnv<'a>,
+    obj: JClass<'a>,
 ) {
-    let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
-    let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
+    let astar = get_astar(&mut env, obj);
+    let hybrid_grid = astar.get_grid();
     hybrid_grid.clear_uncertenty_fields();
 }
 
 #[no_mangle]
-pub extern "system" fn Java_org_pwrup_napoleon_bridge_HybridGrid_addUncertentyField<'a>(
-    env: JNIEnv<'a>,
-    _: JClass<'a>,
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_addUncertentyField<'a>(
+    mut env: JNIEnv<'a>,
+    obj: JClass<'a>,
     center: JFloatArray<'a>,
     radius: jfloat,
     intensity: jfloat,
 ) {
-    let mut astar = STORED_RUST_INSTANCE.lock().unwrap();
-    let mut hybrid_grid = astar.as_mut().unwrap().get_grid().lock().unwrap();
+    let astar = get_astar(&mut env, obj);
+    let hybrid_grid = astar.get_grid();
     let field_center: Vector2<f32> =
         jni_util_extended::from_jfloat_array_to_vector2_float(&env, center);
     hybrid_grid.add_uncertenty_field(field_center, radius, intensity);
@@ -121,9 +123,11 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_initialize
     center_x_y: JIntArray<'a>,
     square_size_meters: jfloat,
     node_pick_style: jint,
-    max_nodes_in_range: jint,
     finder_relative_w_h: JFloatArray<'a>,
-) {
+    do_absolute_discard: jint,
+    avg_distance_min_discard_threshold: jfloat,
+    avg_distance_cost: jfloat,
+) -> jlong {
     let node_pick_style = if node_pick_style == 0 {
         NodePickStyle::ALL
     } else {
@@ -145,7 +149,7 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_initialize
         jni_util_extended::from_jint_array_to_vector2_int(&env, center_x_y);
     let sq_size_meters = square_size_meters as f32;
 
-    let hybrid_grid: HybridGrid<Arc<dyn GenericDynamicObject>> = HybridGrid::new(
+    let hybrid_grid = HybridGrid::new(
         field_dimensions.x,
         field_dimensions.y,
         sq_size_meters,
@@ -158,14 +162,19 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_initialize
         jni_util_extended::from_jfloat_array_to_vector2_float(&env, finder_relative_w_h);
     let distance = robot_dimensions.magnitude();
 
-    let mut stored_instance = STORED_RUST_INSTANCE.lock().unwrap();
-    if stored_instance.is_none() {
-        *stored_instance = Some(AStar::build(
-            hybrid_grid,
-            node_pick_style,
-            1,
-            max_nodes_in_range.into(),
-            (distance * distance + 0.2).into(),
-        ));
-    }
+    let astar = AStar::build(
+        hybrid_grid,
+        node_pick_style,
+        NodeRadiusSearch {
+            node_radius_search_radius: distance,
+            do_absolute_discard: do_absolute_discard != 0,
+            avg_distance_min_discard_threshold: avg_distance_min_discard_threshold as f32,
+            avg_distance_cost: avg_distance_cost as f32,
+        },
+    );
+
+    let boxed_astar = Box::new(astar);
+    let ptr = Box::into_raw(boxed_astar);
+
+    ptr as jlong
 }

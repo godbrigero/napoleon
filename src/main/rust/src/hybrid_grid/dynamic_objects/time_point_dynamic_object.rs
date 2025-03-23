@@ -1,4 +1,4 @@
-use nalgebra::{Matrix3, Matrix4, Rotation3, Unit, Vector2, Vector3};
+use nalgebra::{Matrix3, Vector2};
 
 use crate::hybrid_grid::{math, GenericDynamicObject};
 

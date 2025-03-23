@@ -5,8 +5,7 @@ use std::{
 };
 
 use kiddo::{KdTree, NearestNeighbour};
-use nalgebra::{Matrix3, Vector2, Vector3};
-use num_traits::NumCast;
+use nalgebra::{Matrix3, Vector2};
 
 pub mod dynamic_objects;
 pub mod math;
@@ -35,10 +34,7 @@ pub struct UncertentyField {
 }
 
 #[derive(Clone)]
-pub struct HybridGrid<D>
-where
-    D: GenericDynamicObject + Clone,
-{
+pub struct HybridGrid {
     size_x: i32,
     size_y: i32,
     center_x: i32,
@@ -47,14 +43,13 @@ where
 
     static_obstacles: HashSet<Vector2<i32>>,
     hybrid_obstacles: KdTree<f32, 2>,
-    dynamic_objects: Vec<D>,
 
     uncertenty_defs: HashMap<u64, UncertentyField>,
     uncertenty_fields: KdTree<f32, 2>,
     max_field_radius: f32,
 }
 
-impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
+impl HybridGrid {
     pub fn new_raw(
         size_x: i32,
         size_y: i32,
@@ -69,7 +64,6 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
             center_y,
             square_size_meters,
             static_obstacles: HashSet::new(),
-            dynamic_objects: Vec::new(),
             hybrid_obstacles: KdTree::new(),
             uncertenty_defs: HashMap::new(),
             uncertenty_fields: KdTree::new(),
@@ -100,26 +94,8 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
         self.square_size_meters
     }
 
-    pub fn add_dynamic_object(&mut self, object: D) {
-        self.dynamic_objects.push(object);
-    }
-
     pub fn push_static_obstacle(&mut self, obstacle: Vector2<i32>) {
         self.static_obstacles.insert(obstacle);
-    }
-
-    pub fn get_dynamic_object_transformation_matrices_at(
-        &self,
-        time_ms_since_initial: f64,
-    ) -> Vec<Matrix3<f64>> {
-        self.dynamic_objects
-            .iter()
-            .map(|object| {
-                let transformation_matrix =
-                    object.calculate_transformation_matrix_at(time_ms_since_initial);
-                transformation_matrix
-            })
-            .collect()
     }
 
     pub fn get_static_obstacles(&self) -> &HashSet<Vector2<i32>> {
@@ -175,6 +151,24 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
         false
     }
 
+    pub fn get_all_obstructions_in_radius(
+        &self,
+        position: Vector2<i32>,
+        radius: i32,
+    ) -> Vec<Vector2<i32>> {
+        let mut obstructions = Vec::new();
+        for i in -radius..=radius {
+            for j in -radius..=radius {
+                let check_pos = position + Vector2::new(i, j);
+                if self.is_obstructed(check_pos) {
+                    obstructions.push(check_pos);
+                }
+            }
+        }
+
+        obstructions
+    }
+
     pub fn add_uncertenty_field(&mut self, center: Vector2<f32>, radius: f32, intensity: f32) {
         let position = (self.uncertenty_defs.len() + 1) as u64;
         if radius > self.max_field_radius {
@@ -198,12 +192,104 @@ impl<D: GenericDynamicObject + Clone> HybridGrid<D> {
         self.uncertenty_fields = KdTree::new();
     }
 
-    // TODO: what if no fields were found...?
-    pub fn get_uncertenty_field(&self, position: Vector2<f32>) -> Option<UncertentyField> {
+    pub fn get_uncertenty_field(&self, position: Vector2<f32>) -> Option<(UncertentyField, f32)> {
         let output = self
             .uncertenty_fields
             .nearest_one::<kiddo::SquaredEuclidean>(&[position.x as f32, position.y as f32]);
 
-        return self.uncertenty_defs.get(&output.item).cloned();
+        if !self.uncertenty_defs.contains_key(&output.item) {
+            return None;
+        }
+
+        let field = self.uncertenty_defs.get(&output.item).unwrap();
+
+        if field.radius < output.distance {
+            return None;
+        }
+
+        Some((field.clone(), output.distance))
+    }
+
+    pub fn uncertenty_field_cost_ramping(
+        &self,
+        distance_cur: f32,
+        distance_field: f32,
+        intensity: f32,
+    ) -> f32 {
+        let distance_ratio = distance_cur / distance_field;
+        let eased_ratio = 1.0 - (1.0 - distance_ratio).powi(2); // Quadratic easing out
+        eased_ratio * intensity
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nalgebra::Vector2;
+
+    #[test]
+    fn test_grid_creation() {
+        let grid = HybridGrid::new(100, 100, 1.0, vec![], 0, 0);
+        assert_eq!(grid.get_square_size_meters(), 1.0);
+        assert!(grid.get_static_obstacles().is_empty());
+    }
+
+    #[test]
+    fn test_static_obstacles() {
+        let mut grid = HybridGrid::new_raw(100, 100, 1.0, 0, 0);
+        let obstacle = Vector2::new(5, 5);
+
+        grid.push_static_obstacle(obstacle);
+        assert!(grid.is_obstructed(obstacle));
+        assert!(!grid.is_obstructed(Vector2::new(6, 6)));
+    }
+
+    #[test]
+    fn test_grid_boundaries() {
+        let grid = HybridGrid::new(10, 10, 1.0, vec![], 0, 0);
+
+        assert!(grid.is_outside_grid(Vector2::new(6, 0)));
+        assert!(grid.is_outside_grid(Vector2::new(0, 6)));
+        assert!(!grid.is_outside_grid(Vector2::new(0, 0)));
+    }
+
+    #[test]
+    fn test_hybrid_objects() {
+        let mut grid = HybridGrid::new_raw(100, 100, 1.0, 0, 0);
+        let object = [1.0, 1.0];
+
+        grid.add_hybrid_object(&object);
+        let nearest = grid.get_nearest(Vector2::new(1, 1), 10.0);
+        assert!(!nearest.is_empty());
+
+        grid.clear_hybrid_objects();
+        let nearest_after_clear = grid.get_nearest(Vector2::new(1, 1), 10.0);
+        assert!(nearest_after_clear.is_empty());
+    }
+
+    #[test]
+    fn test_obstruction_in_radius() {
+        let mut grid = HybridGrid::new_raw(100, 100, 1.0, 0, 0);
+        grid.push_static_obstacle(Vector2::new(1, 1));
+
+        assert!(grid.is_obstruction_in_radius(Vector2::new(0, 0), 2));
+        assert!(!grid.is_obstruction_in_radius(Vector2::new(0, 0), 0));
+    }
+
+    #[test]
+    fn test_uncertainty_fields() {
+        let mut grid = HybridGrid::new_raw(100, 100, 1.0, 0, 0);
+        let center = Vector2::new(1.0, 1.0);
+
+        grid.add_uncertenty_field(center, 2.0, 0.5);
+        let field = grid.get_uncertenty_field(center);
+
+        assert!(field.is_some());
+        let (field, distance) = field.unwrap();
+        assert_eq!(field.radius, 2.0);
+        assert_eq!(field.intensity, 0.5);
+        assert_eq!(distance, 0.0);
+        grid.clear_uncertenty_fields();
+        assert!(grid.get_uncertenty_field(center).is_none());
     }
 }

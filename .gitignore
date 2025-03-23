@@ -37,3 +37,7 @@ plots/
 
 lib/vendor/
 lib/bin/
+
+src/main/java/org/pwrup/napoleon/Main.java
+src/main/java/org/pwrup/napoleon/PathVisualizer.java
+blue_a_annotations.json

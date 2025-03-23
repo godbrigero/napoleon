@@ -1,37 +1,48 @@
 package org.pwrup.napoleon.bridge;
 
-public class AStarPathfinder {
+public class AStarPathfinder implements AutoCloseable {
   static {
     NativeLoader.init();
   }
 
+  private long nativePtr;
   private HybridGrid hybridGrid;
 
   public AStarPathfinder(
-      HybridGrid hybridGrid,
-      NodePickStyle nodePickStyle,
-      int maxNodesInRange,
-      float finderRelativeW,
-      float finderRelativeH) {
+    HybridGrid hybridGrid,
+    NodePickStyle nodePickStyle,
+    float finderRelativeW,
+    float finderRelativeH,
+    boolean doAbsoluteDiscard,
+    float avgDistanceMinDiscardThreshold,
+    float avgDistanceCost
+  ) {
     this.hybridGrid = hybridGrid;
-    this.initialize(
-        hybridGrid.getStaticObstacles(),
-        new int[] { hybridGrid.getWidthX(), hybridGrid.getWidthY() },
-        new int[] { hybridGrid.getCenterX(), hybridGrid.getCenterY() },
-        hybridGrid.getSqSizeMeters(),
-        nodePickStyle.getValue(),
-        maxNodesInRange,
-        new float[] { finderRelativeW, finderRelativeH });
+    this.nativePtr =
+      this.initialize(
+          hybridGrid.getStaticObstacles(),
+          new int[] { hybridGrid.getWidthX(), hybridGrid.getWidthY() },
+          new int[] { hybridGrid.getCenterX(), hybridGrid.getCenterY() },
+          hybridGrid.getSqSizeMeters(),
+          nodePickStyle.getValue(),
+          new float[] { finderRelativeW, finderRelativeH },
+          doAbsoluteDiscard ? 1 : 0,
+          avgDistanceMinDiscardThreshold,
+          avgDistanceCost
+        );
   }
 
-  private native void initialize(
-      int[] static_obstacles,
-      int[] size_x_y,
-      int[] center_x_y,
-      float square_size_meters,
-      int node_pick_style,
-      int max_nodes_in_range,
-      float[] finder_relative_w_h);
+  private native long initialize(
+    int[] staticObstacles,
+    int[] sizeXY,
+    int[] centerXY,
+    float squareSizeMeters,
+    int nodePickStyle,
+    float[] finderRelativeWH,
+    int doAbsoluteDiscard,
+    float avgDistanceMinDiscardThreshold,
+    float avgDistanceCost
+  );
 
   public native int[] calculate(int[] start_x_y, int[] end_x_y);
 
@@ -41,5 +52,16 @@ public class AStarPathfinder {
 
   public native void clearUncertentyFields();
 
-  public native void addUncertentyField(float[] center, float radius, float intensity);
+  public native void addUncertentyField(
+    float[] center,
+    float radius,
+    float intensity
+  );
+
+  private native void cleanup();
+
+  @Override
+  public void close() {
+    cleanup();
+  }
 }
