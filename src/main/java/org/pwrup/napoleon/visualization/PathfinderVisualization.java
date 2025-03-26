@@ -21,6 +21,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
 import javax.swing.SwingUtilities;
@@ -48,8 +49,35 @@ public class PathfinderVisualization extends JFrame {
   private NodePickStyle nodePickStyle = NodePickStyle.ALL;
 
   private List<int[]> obstacles = new ArrayList<>();
+  private List<float[]> hybridObstacles = new ArrayList<>();
+  private List<UncertaintyField> uncertaintyFields = new ArrayList<>();
   private long lastCalculationTime = 0;
   private JLabel timeLabel;
+
+  // Current interaction mode
+  private InteractionMode currentMode = InteractionMode.OBSTACLE;
+
+  // Enum for different mouse interaction modes
+  private enum InteractionMode {
+    OBSTACLE,
+    START_END,
+    HYBRID_OBSTACLE,
+    UNCERTAINTY_FIELD,
+  }
+
+  // Class to store uncertainty field data
+  private static class UncertaintyField {
+
+    float[] center; // x, y
+    float radius;
+    float intensity;
+
+    public UncertaintyField(float[] center, float radius, float intensity) {
+      this.center = center;
+      this.radius = radius;
+      this.intensity = intensity;
+    }
+  }
 
   public PathfinderVisualization() {
     setTitle("A* Pathfinder Visualization");
@@ -183,7 +211,151 @@ public class PathfinderVisualization extends JFrame {
       )
     );
 
-    JButton clearObstaclesButton = new JButton("Clear Obstacles");
+    // Interaction mode selection
+    JLabel modeLabel = new JLabel("Interaction Mode:");
+    modeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+    controlPanel.add(modeLabel);
+
+    JComboBox<String> modeCombo = new JComboBox<>(
+      new String[] {
+        "Static Obstacles",
+        "Start/End Points",
+        "Hybrid Obstacles",
+        "Uncertainty Fields",
+      }
+    );
+    modeCombo.setMaximumSize(new Dimension(300, 30));
+    modeCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
+    modeCombo.addActionListener(e -> {
+      switch (modeCombo.getSelectedIndex()) {
+        case 0:
+          currentMode = InteractionMode.OBSTACLE;
+          break;
+        case 1:
+          currentMode = InteractionMode.START_END;
+          break;
+        case 2:
+          currentMode = InteractionMode.HYBRID_OBSTACLE;
+          break;
+        case 3:
+          currentMode = InteractionMode.UNCERTAINTY_FIELD;
+          break;
+      }
+    });
+    controlPanel.add(modeCombo);
+    controlPanel.add(Box.createVerticalStrut(15));
+
+    // Hybrid obstacle controls
+    JLabel hybridObstacleLabel = new JLabel("Hybrid Obstacles:");
+    hybridObstacleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+    hybridObstacleLabel.setFont(new Font("Arial", Font.BOLD, 12));
+    controlPanel.add(hybridObstacleLabel);
+
+    JButton addHybridObstacleButton = new JButton("Add Hybrid Obstacle");
+    addHybridObstacleButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+    addHybridObstacleButton.addActionListener(e -> {
+      String input = JOptionPane.showInputDialog(
+        this,
+        "Enter hybrid obstacle data (x,y,width,height):",
+        "Add Hybrid Obstacle",
+        JOptionPane.PLAIN_MESSAGE
+      );
+
+      if (input != null && !input.trim().isEmpty()) {
+        try {
+          String[] parts = input.split(",");
+          if (parts.length == 4) {
+            float[] obstacle = new float[4];
+            for (int i = 0; i < 4; i++) {
+              obstacle[i] = Float.parseFloat(parts[i].trim());
+            }
+            hybridObstacles.add(obstacle);
+            updatePathfinderWithDynamicObjects();
+            calculatePath();
+            gridPanel.repaint();
+          }
+        } catch (NumberFormatException ex) {
+          JOptionPane.showMessageDialog(
+            this,
+            "Invalid input format. Please use x,y,width,height format with numeric values.",
+            "Error",
+            JOptionPane.ERROR_MESSAGE
+          );
+        }
+      }
+    });
+    controlPanel.add(addHybridObstacleButton);
+
+    JButton clearHybridObstaclesButton = new JButton("Clear Hybrid Obstacles");
+    clearHybridObstaclesButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+    clearHybridObstaclesButton.addActionListener(e -> {
+      hybridObstacles.clear();
+      updatePathfinderWithDynamicObjects();
+      calculatePath();
+      gridPanel.repaint();
+    });
+    controlPanel.add(clearHybridObstaclesButton);
+    controlPanel.add(Box.createVerticalStrut(15));
+
+    // Uncertainty field controls
+    JLabel uncertaintyFieldLabel = new JLabel("Uncertainty Fields:");
+    uncertaintyFieldLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+    uncertaintyFieldLabel.setFont(new Font("Arial", Font.BOLD, 12));
+    controlPanel.add(uncertaintyFieldLabel);
+
+    JButton addUncertaintyFieldButton = new JButton("Add Uncertainty Field");
+    addUncertaintyFieldButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+    addUncertaintyFieldButton.addActionListener(e -> {
+      String input = JOptionPane.showInputDialog(
+        this,
+        "Enter uncertainty field data (centerX,centerY,radius,intensity):",
+        "Add Uncertainty Field",
+        JOptionPane.PLAIN_MESSAGE
+      );
+
+      if (input != null && !input.trim().isEmpty()) {
+        try {
+          String[] parts = input.split(",");
+          if (parts.length == 4) {
+            float[] center = new float[2];
+            center[0] = Float.parseFloat(parts[0].trim());
+            center[1] = Float.parseFloat(parts[1].trim());
+            float radius = Float.parseFloat(parts[2].trim());
+            float intensity = Float.parseFloat(parts[3].trim());
+
+            uncertaintyFields.add(
+              new UncertaintyField(center, radius, intensity)
+            );
+            updatePathfinderWithDynamicObjects();
+            calculatePath();
+            gridPanel.repaint();
+          }
+        } catch (NumberFormatException ex) {
+          JOptionPane.showMessageDialog(
+            this,
+            "Invalid input format. Please use centerX,centerY,radius,intensity format with numeric values.",
+            "Error",
+            JOptionPane.ERROR_MESSAGE
+          );
+        }
+      }
+    });
+    controlPanel.add(addUncertaintyFieldButton);
+
+    JButton clearUncertaintyFieldsButton = new JButton(
+      "Clear Uncertainty Fields"
+    );
+    clearUncertaintyFieldsButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+    clearUncertaintyFieldsButton.addActionListener(e -> {
+      uncertaintyFields.clear();
+      updatePathfinderWithDynamicObjects();
+      calculatePath();
+      gridPanel.repaint();
+    });
+    controlPanel.add(clearUncertaintyFieldsButton);
+    controlPanel.add(Box.createVerticalStrut(15));
+
+    JButton clearObstaclesButton = new JButton("Clear Static Obstacles");
     clearObstaclesButton.setAlignmentX(Component.LEFT_ALIGNMENT);
     clearObstaclesButton.addActionListener(e -> {
       obstacles.clear();
@@ -204,7 +376,10 @@ public class PathfinderVisualization extends JFrame {
     controlPanel.add(Box.createVerticalStrut(10));
 
     JLabel instructionsLabel = new JLabel(
-      "<html>Left click to place/remove obstacles<br>Right click to set start point<br>Middle click to set end point</html>"
+      "<html>Select interaction mode above.<br>" +
+      "In Static Obstacles mode: Left click to place/remove obstacles<br>" +
+      "In Start/End mode: Right click to set start, Middle click to set end<br>" +
+      "In Hybrid/Uncertainty modes: Use buttons to add objects</html>"
     );
     instructionsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
     controlPanel.add(instructionsLabel);
@@ -291,6 +466,37 @@ public class PathfinderVisualization extends JFrame {
         avgDistanceMinDiscardThreshold,
         avgDistanceCost
       );
+
+    // Add dynamic objects to the newly created pathfinder
+    updatePathfinderWithDynamicObjects();
+  }
+
+  private void updatePathfinderWithDynamicObjects() {
+    if (pathfinder != null) {
+      // Clear existing dynamic objects
+      pathfinder.clearHybridObjects();
+      pathfinder.clearUncertentyFields();
+
+      // Add hybrid obstacles
+      if (!hybridObstacles.isEmpty()) {
+        float[] allHybridObstacles = new float[hybridObstacles.size() * 4];
+        int index = 0;
+        for (float[] obstacle : hybridObstacles) {
+          System.arraycopy(obstacle, 0, allHybridObstacles, index, 4);
+          index += 4;
+        }
+        pathfinder.addHybridObjects(allHybridObstacles);
+      }
+
+      // Add uncertainty fields
+      for (UncertaintyField field : uncertaintyFields) {
+        pathfinder.addUncertentyField(
+          field.center,
+          field.radius,
+          field.intensity
+        );
+      }
+    }
   }
 
   private void calculatePath() {
@@ -340,33 +546,104 @@ public class PathfinderVisualization extends JFrame {
             int gridY = (e.getY() - GRID_OFFSET_Y) / CELL_SIZE;
 
             if (gridX >= 0 && gridX < 50 && gridY >= 0 && gridY < 50) {
-              if (e.getButton() == MouseEvent.BUTTON1) {
-                boolean removed = false;
-                for (int i = 0; i < obstacles.size(); i++) {
-                  if (
-                    obstacles.get(i)[0] == gridX && obstacles.get(i)[1] == gridY
-                  ) {
-                    obstacles.remove(i);
-                    removed = true;
-                    break;
+              switch (currentMode) {
+                case OBSTACLE:
+                  if (e.getButton() == MouseEvent.BUTTON1) {
+                    boolean removed = false;
+                    for (int i = 0; i < obstacles.size(); i++) {
+                      if (
+                        obstacles.get(i)[0] == gridX &&
+                        obstacles.get(i)[1] == gridY
+                      ) {
+                        obstacles.remove(i);
+                        removed = true;
+                        break;
+                      }
+                    }
+
+                    if (!removed) {
+                      obstacles.add(new int[] { gridX, gridY });
+                    }
+
+                    createPathfinder();
+                    calculatePath();
+                    repaint();
                   }
-                }
-
-                if (!removed) {
-                  obstacles.add(new int[] { gridX, gridY });
-                }
-
-                createPathfinder();
-                calculatePath();
-                repaint();
-              } else if (e.getButton() == MouseEvent.BUTTON3) {
-                startPoint = new int[] { gridX, gridY };
-                calculatePath();
-                repaint();
-              } else if (e.getButton() == MouseEvent.BUTTON2) {
-                endPoint = new int[] { gridX, gridY };
-                calculatePath();
-                repaint();
+                  break;
+                case START_END:
+                  if (e.getButton() == MouseEvent.BUTTON3) {
+                    startPoint = new int[] { gridX, gridY };
+                    calculatePath();
+                    repaint();
+                  } else if (e.getButton() == MouseEvent.BUTTON2) {
+                    endPoint = new int[] { gridX, gridY };
+                    calculatePath();
+                    repaint();
+                  }
+                  break;
+                case HYBRID_OBSTACLE:
+                  if (e.getButton() == MouseEvent.BUTTON1) {
+                    // Show dialog to get hybrid obstacle size
+                    String input = JOptionPane.showInputDialog(
+                      PathfinderVisualization.this,
+                      "Enter hybrid obstacle width,height:",
+                      "2.0,2.0"
+                    );
+                    if (input != null) {
+                      try {
+                        String[] parts = input.split(",");
+                        float width = Float.parseFloat(parts[0].trim());
+                        float height = Float.parseFloat(parts[1].trim());
+                        float[] obstacle = new float[] {
+                          gridX,
+                          gridY,
+                          width,
+                          height,
+                        };
+                        hybridObstacles.add(obstacle);
+                        updatePathfinderWithDynamicObjects();
+                        calculatePath();
+                        repaint();
+                      } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(
+                          PathfinderVisualization.this,
+                          "Invalid input format"
+                        );
+                      }
+                    }
+                  }
+                  break;
+                case UNCERTAINTY_FIELD:
+                  if (e.getButton() == MouseEvent.BUTTON1) {
+                    // Show dialog to get uncertainty field parameters
+                    String input = JOptionPane.showInputDialog(
+                      PathfinderVisualization.this,
+                      "Enter radius,intensity:",
+                      "5.0,0.8"
+                    );
+                    if (input != null) {
+                      try {
+                        String[] parts = input.split(",");
+                        float radius = Float.parseFloat(parts[0].trim());
+                        float intensity = Float.parseFloat(parts[1].trim());
+                        UncertaintyField field = new UncertaintyField(
+                          new float[] { gridX, gridY },
+                          radius,
+                          intensity
+                        );
+                        uncertaintyFields.add(field);
+                        updatePathfinderWithDynamicObjects();
+                        calculatePath();
+                        repaint();
+                      } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(
+                          PathfinderVisualization.this,
+                          "Invalid input format"
+                        );
+                      }
+                    }
+                  }
+                  break;
               }
             }
           }
@@ -401,6 +678,7 @@ public class PathfinderVisualization extends JFrame {
         );
       }
 
+      // Draw static obstacles
       for (int[] obstacle : obstacles) {
         g2d.setColor(Color.BLACK);
         g2d.fillRect(
@@ -408,6 +686,71 @@ public class PathfinderVisualization extends JFrame {
           GRID_OFFSET_Y + obstacle[1] * CELL_SIZE,
           CELL_SIZE,
           CELL_SIZE
+        );
+      }
+
+      // Draw hybrid obstacles
+      for (float[] obstacle : hybridObstacles) {
+        g2d.setColor(new Color(139, 69, 19, 128)); // Semi-transparent brown
+        int x = Math.round(obstacle[0]);
+        int y = Math.round(obstacle[1]);
+        int width = Math.round(obstacle[2]);
+        int height = Math.round(obstacle[3]);
+        g2d.fillRect(
+          GRID_OFFSET_X + x * CELL_SIZE,
+          GRID_OFFSET_Y + y * CELL_SIZE,
+          width * CELL_SIZE,
+          height * CELL_SIZE
+        );
+        g2d.setColor(new Color(139, 69, 19));
+        g2d.drawRect(
+          GRID_OFFSET_X + x * CELL_SIZE,
+          GRID_OFFSET_Y + y * CELL_SIZE,
+          width * CELL_SIZE,
+          height * CELL_SIZE
+        );
+      }
+
+      // Draw uncertainty fields
+      for (UncertaintyField field : uncertaintyFields) {
+        float[] center = field.center;
+        float radius = field.radius;
+        float intensity = field.intensity;
+
+        // Create a gradient color based on intensity (more red = higher intensity)
+        Color fieldColor = new Color(
+          Math.min(1.0f, intensity),
+          Math.max(0.0f, 1.0f - intensity),
+          0.0f,
+          0.3f
+        );
+        g2d.setColor(fieldColor);
+
+        int x = Math.round(center[0]);
+        int y = Math.round(center[1]);
+        int diameterCells = Math.round(radius * 2);
+
+        g2d.fillOval(
+          GRID_OFFSET_X + (x - Math.round(radius)) * CELL_SIZE,
+          GRID_OFFSET_Y + (y - Math.round(radius)) * CELL_SIZE,
+          diameterCells * CELL_SIZE,
+          diameterCells * CELL_SIZE
+        );
+
+        // Draw outline
+        g2d.setColor(
+          new Color(
+            Math.min(1.0f, intensity),
+            Math.max(0.0f, 1.0f - intensity),
+            0.0f,
+            0.7f
+          )
+        );
+        g2d.drawOval(
+          GRID_OFFSET_X + (x - Math.round(radius)) * CELL_SIZE,
+          GRID_OFFSET_Y + (y - Math.round(radius)) * CELL_SIZE,
+          diameterCells * CELL_SIZE,
+          diameterCells * CELL_SIZE
         );
       }
 
