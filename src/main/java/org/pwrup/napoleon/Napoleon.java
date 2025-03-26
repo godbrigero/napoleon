@@ -12,6 +12,7 @@ public class Napoleon {
   public static void launchPathfinderVisualization() {
     SwingUtilities.invokeLater(() -> {
       try {
+        System.out.println("Loading grid from file: " + DEFAULT_GRID_PATH);
         // Load the HybridGrid from file
         HybridGrid grid = new HybridGrid(DEFAULT_GRID_PATH);
 

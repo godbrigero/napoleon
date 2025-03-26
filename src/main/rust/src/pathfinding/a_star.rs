@@ -72,18 +72,11 @@ impl Pathfinding for AStar {
         let mut open_set = BinaryHeap::new();
         let mut closed_set = HashSet::new();
         let mut g_scores = HashMap::new();
-        let mut f_scores = HashMap::new();
-
-        open_set.push(Node::new(start, None));
         g_scores.insert(start, 0.0);
-        f_scores.insert(start, end_node.distance_to(&Node::new(start, None)));
+        open_set.push(Node::new(start, None));
 
         while let Some(current) = open_set.pop() {
             let position = current.get_position();
-
-            if closed_set.contains(&position) {
-                continue;
-            }
 
             if position == end_node.get_position() {
                 println!("Found path {:?}", closed_set.len());
@@ -103,16 +96,17 @@ impl Pathfinding for AStar {
                 }
 
                 let tentative_g_cost =
-                    g_scores.get(&position).unwrap() + current.distance_to(&neighbor);
+                    current.distance_to(&neighbor) + g_scores.get(&position).unwrap();
 
-                if let Some(&current_g) = g_scores.get(&neighbor_position) {
-                    if current_g <= tentative_g_cost {
-                        continue;
-                    }
+                let best_g_score = g_scores.get(&neighbor_position).unwrap_or(&f64::MAX);
+
+                if tentative_g_cost >= *best_g_score {
+                    continue;
                 }
 
-                let mut extra_cost = 0.0;
+                g_scores.insert(neighbor_position, tentative_g_cost);
 
+                let mut extra_cost = 0.0;
                 if neighbor_position != end_node.get_position() {
                     let scaled_radius = self.node_radius_search_config.node_radius_search_radius;
 
@@ -132,12 +126,13 @@ impl Pathfinding for AStar {
                         .node_radius_search_config
                         .avg_distance_min_discard_threshold;
 
+                    /*
                     if self.node_radius_search_config.do_absolute_discard {
                         println!(
                             "Position: {:?}, Avg dist: {:.2}, Threshold: {:.2}",
                             neighbor_position, avg_distance, threshold
                         );
-                    }
+                    } */
 
                     if self.node_radius_search_config.do_absolute_discard
                         && avg_distance < threshold
@@ -162,7 +157,7 @@ impl Pathfinding for AStar {
                     if let Some((field, distance)) = self.grid.get_nearest_uncertainty_field(
                         Vector2::new(neighbor_position.x as f32, neighbor_position.y as f32),
                     ) {
-                        extra_cost += self.grid.uncertenty_field_cost_ramping(
+                        extra_cost += self.grid.uncertainty_field_cost_ramping(
                             distance,
                             field.radius,
                             field.intensity,
@@ -172,11 +167,6 @@ impl Pathfinding for AStar {
 
                 let f_cost = tentative_g_cost + end_node.distance_to(&neighbor) + extra_cost as f64;
                 neighbor.set_cost(f_cost);
-                neighbor.set_g_score(tentative_g_cost);
-
-                g_scores.insert(neighbor_position, tentative_g_cost);
-                f_scores.insert(neighbor_position, f_cost);
-
                 open_set.push(neighbor);
             }
         }

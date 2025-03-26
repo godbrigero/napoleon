@@ -189,7 +189,7 @@ impl HybridGrid {
         Some((field.clone(), output.distance))
     }
 
-    pub fn uncertenty_field_cost_ramping(
+    pub fn uncertainty_field_cost_ramping(
         &self,
         distance_cur: f32,
         distance_field: f32,

@@ -94,14 +94,6 @@ impl Node {
     pub fn get_cost(&self) -> f64 {
         return self.cost;
     }
-
-    pub fn set_g_score(&mut self, new_score: f64) {
-        self.g_score = new_score;
-    }
-
-    pub fn get_g_cost(&self) -> f64 {
-        return self.g_score;
-    }
 }
 
 impl Ord for Node {
