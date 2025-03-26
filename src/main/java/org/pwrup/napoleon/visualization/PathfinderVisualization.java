@@ -79,6 +79,32 @@ public class PathfinderVisualization extends JFrame {
     }
   }
 
+  /**
+   * Constructor that accepts a pre-configured HybridGrid
+   *
+   * @param grid The HybridGrid configuration to use
+   */
+  public PathfinderVisualization(HybridGrid grid) {
+    setTitle("A* Pathfinder Visualization - Loaded from File");
+    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    setSize(1000, 700);
+
+    this.hybridGrid = grid;
+
+    // Extract obstacles from the grid
+    int[] staticObstacles = grid.getStaticObstacles();
+    obstacles.clear();
+    for (int i = 0; i < staticObstacles.length; i += 2) {
+      if (i + 1 < staticObstacles.length) {
+        obstacles.add(new int[] { staticObstacles[i], staticObstacles[i + 1] });
+      }
+    }
+
+    initComponents();
+    createPathfinderWithGrid();
+    calculatePath();
+  }
+
   public PathfinderVisualization() {
     setTitle("A* Pathfinder Visualization");
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -451,6 +477,28 @@ public class PathfinderVisualization extends JFrame {
         staticObstacles
       );
 
+    if (pathfinder != null) {
+      pathfinder.close();
+      pathfinder = null;
+    }
+
+    pathfinder =
+      new AStarPathfinder(
+        hybridGrid,
+        nodePickStyle,
+        finderRelativeW,
+        finderRelativeH,
+        doAbsoluteDiscard,
+        avgDistanceMinDiscardThreshold,
+        avgDistanceCost
+      );
+
+    // Add dynamic objects to the newly created pathfinder
+    updatePathfinderWithDynamicObjects();
+  }
+
+  // Method to create pathfinder with existing grid
+  private void createPathfinderWithGrid() {
     if (pathfinder != null) {
       pathfinder.close();
       pathfinder = null;
