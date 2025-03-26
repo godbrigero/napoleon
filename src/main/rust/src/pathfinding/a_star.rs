@@ -21,6 +21,32 @@ fn get_distance_squared(node: &Vector2<i32>, other: &Vector2<i32>) -> f32 {
     return (node.x as f32 - other.x as f32).powi(2) + (node.y as f32 - other.y as f32).powi(2);
 }
 
+fn get_distance(node: &Vector2<i32>, other: &Vector2<i32>) -> f32 {
+    get_distance_squared(node, other).sqrt()
+}
+
+fn get_avg_distances_nearest_nodes(grid: &HybridGrid, radius: f32, center: Vector2<i32>) -> f32 {
+    let static_nodes_in_radius = grid.get_all_obstructions_in_radius(center, radius as i32);
+    let hybrid_nodes_in_radius = grid.get_nearest_hybrid(center, radius);
+
+    if static_nodes_in_radius.len() == 0 && hybrid_nodes_in_radius.len() == 0 {
+        return f32::MAX;
+    }
+
+    let mut all_distances = static_nodes_in_radius
+        .iter()
+        .map(|node| get_distance(&center, &node) * grid.get_square_size_meters())
+        .collect::<Vec<f32>>();
+
+    all_distances.extend(
+        hybrid_nodes_in_radius
+            .iter()
+            .map(|node| node.distance.sqrt() * grid.get_square_size_meters()),
+    );
+
+    return average_distance(&all_distances);
+}
+
 pub struct AStar {
     grid: HybridGrid,
     pick_style: NodePickStyle,
@@ -33,7 +59,7 @@ impl Pathfinding for AStar {
             grid: hybrid_grid,
             pick_style: NodePickStyle::ALL,
             node_radius_search_config: NodeRadiusSearch {
-                node_radius_search_radius_squared: 1.0,
+                node_radius_search_radius: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 1.0,
                 avg_distance_cost: 1.0,
@@ -46,9 +72,11 @@ impl Pathfinding for AStar {
         let mut open_set = BinaryHeap::new();
         let mut closed_set = HashSet::new();
         let mut g_scores = HashMap::new();
+        let mut f_scores = HashMap::new();
 
         open_set.push(Node::new(start, None));
         g_scores.insert(start, 0.0);
+        f_scores.insert(start, end_node.distance_to(&Node::new(start, None)));
 
         while let Some(current) = open_set.pop() {
             let position = current.get_position();
@@ -65,72 +93,91 @@ impl Pathfinding for AStar {
             closed_set.insert(position);
 
             for mut neighbor in current.get_positions_around(&self.pick_style) {
-                if closed_set.contains(&neighbor.get_position())
-                    || self.grid.is_outside_grid(neighbor.get_position())
-                    || self.grid.is_obstructed(neighbor.get_position())
+                let neighbor_position = neighbor.get_position();
+
+                if self.grid.is_outside_grid(neighbor_position)
+                    || self.grid.is_obstructed(neighbor_position)
+                    || closed_set.contains(&neighbor_position)
                 {
                     continue;
                 }
 
-                let static_nodes_in_radius = self.grid.get_all_obstructions_in_radius(
-                    neighbor.get_position(),
-                    self.node_radius_search_config
-                        .node_radius_search_radius_squared as i32,
-                );
-                let hybrid_nodes_in_radius = self.grid.get_nearest(
-                    neighbor.get_position(),
-                    self.node_radius_search_config
-                        .node_radius_search_radius_squared as f32,
-                );
-                let mut all_distances = static_nodes_in_radius
-                    .iter()
-                    .map(|node| get_distance_squared(&neighbor.get_position(), &node))
-                    .collect::<Vec<f32>>();
-                all_distances.extend(hybrid_nodes_in_radius.iter().map(|node| node.distance));
+                let tentative_g_cost =
+                    g_scores.get(&position).unwrap() + current.distance_to(&neighbor);
 
-                let avg_distance = average_distance(&all_distances);
-                if neighbor.get_position() != end_node.get_position() {
-                    if self.node_radius_search_config.do_absolute_discard
-                        && avg_distance != 0.0
-                        && avg_distance
-                            <= self
-                                .node_radius_search_config
-                                .avg_distance_min_discard_threshold
-                    {
+                if let Some(&current_g) = g_scores.get(&neighbor_position) {
+                    if current_g <= tentative_g_cost {
                         continue;
                     }
                 }
 
-                let g_score = *g_scores.get(&position).unwrap_or(&f64::MIN);
-                let neighbor_position = neighbor.get_position();
-                let tentative_g_cost = g_score + current.distance_to(&neighbor);
-                let neighbor_g_cost = g_scores
-                    .get(&neighbor_position)
-                    .copied()
-                    .unwrap_or(f64::INFINITY);
+                let mut extra_cost = 0.0;
 
-                if tentative_g_cost < neighbor_g_cost {
-                    let mut extra_cost =
-                        if let Some((field, distance)) = self.grid.get_uncertenty_field(
-                            Vector2::new(neighbor_position.x as f32, neighbor_position.y as f32),
-                        ) {
-                            self.grid.uncertenty_field_cost_ramping(
-                                distance,
-                                field.radius,
-                                field.intensity,
-                            )
+                if neighbor_position != end_node.get_position() {
+                    let scaled_radius = self.node_radius_search_config.node_radius_search_radius;
+
+                    let avg_distance = if self.node_radius_search_config.do_absolute_discard
+                        || self.node_radius_search_config.avg_distance_cost != 0.0
+                    {
+                        get_avg_distances_nearest_nodes(
+                            &self.grid,
+                            scaled_radius,
+                            neighbor_position,
+                        )
+                    } else {
+                        f32::MAX
+                    };
+
+                    let threshold = self
+                        .node_radius_search_config
+                        .avg_distance_min_discard_threshold;
+
+                    if self.node_radius_search_config.do_absolute_discard {
+                        println!(
+                            "Position: {:?}, Avg dist: {:.2}, Threshold: {:.2}",
+                            neighbor_position, avg_distance, threshold
+                        );
+                    }
+
+                    if self.node_radius_search_config.do_absolute_discard
+                        && avg_distance < threshold
+                        && avg_distance != f32::MAX
+                    {
+                        continue;
+                    }
+
+                    if avg_distance != f32::MAX
+                        && self.node_radius_search_config.avg_distance_cost != 0.0
+                    {
+                        let proximity_cost = if avg_distance < 0.001 {
+                            self.node_radius_search_config.avg_distance_cost * 1000.0
                         } else {
-                            0.0
+                            self.node_radius_search_config.avg_distance_cost
+                                * (scaled_radius / avg_distance)
                         };
-                    extra_cost += avg_distance * self.node_radius_search_config.avg_distance_cost;
 
-                    neighbor.set_cost(
-                        tentative_g_cost + end_node.distance_to(&neighbor) + extra_cost as f64,
-                    );
+                        extra_cost += proximity_cost;
+                    }
 
-                    g_scores.insert(neighbor.get_position(), tentative_g_cost);
-                    open_set.push(neighbor);
+                    if let Some((field, distance)) = self.grid.get_nearest_uncertainty_field(
+                        Vector2::new(neighbor_position.x as f32, neighbor_position.y as f32),
+                    ) {
+                        extra_cost += self.grid.uncertenty_field_cost_ramping(
+                            distance,
+                            field.radius,
+                            field.intensity,
+                        );
+                    }
                 }
+
+                let f_cost = tentative_g_cost + end_node.distance_to(&neighbor) + extra_cost as f64;
+                neighbor.set_cost(f_cost);
+                neighbor.set_g_score(tentative_g_cost);
+
+                g_scores.insert(neighbor_position, tentative_g_cost);
+                f_scores.insert(neighbor_position, f_cost);
+
+                open_set.push(neighbor);
             }
         }
 
@@ -215,7 +262,7 @@ mod tests {
             grid,
             NodePickStyle::SIDES,
             NodeRadiusSearch {
-                node_radius_search_radius_squared: 2.0,
+                node_radius_search_radius: 2.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 2.0,
@@ -242,7 +289,7 @@ mod tests {
     #[test]
     fn test_path_with_uncertainty() {
         let mut grid = create_empty_grid();
-        grid.add_uncertenty_field(Vector2::new(2.0, 2.0), 2.0, 10.0);
+        grid.add_uncertainty_field(Vector2::new(2.0, 2.0), 2.0, 10.0);
         let astar = AStar::new(grid);
         let path = astar.calculate_path(Vector2::new(0, 0), Vector2::new(4, 4));
         assert!(path.is_some());
@@ -258,7 +305,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius_squared: 1.0,
+                node_radius_search_radius: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 2.0,
@@ -292,7 +339,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius_squared: 1.0,
+                node_radius_search_radius: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 2.0,
@@ -306,14 +353,13 @@ mod tests {
     #[test]
     fn test_node_radius_search_discard() {
         let mut grid = create_empty_grid();
-        // Add several hybrid objects close together to create a high-density area
         grid.push_static_obstacle(Vector2::new(2, 2));
 
         let astar = AStar::build(
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius_squared: 2.0,
+                node_radius_search_radius: 2.0,
                 do_absolute_discard: true,
                 avg_distance_min_discard_threshold: 1.0,
                 avg_distance_cost: 2.0,
@@ -323,7 +369,6 @@ mod tests {
         let path = astar.calculate_path(Vector2::new(0, 0), Vector2::new(4, 4));
         assert!(path.is_some());
         let path = path.unwrap();
-        // Path should avoid the dense area around (2,2)
         assert!(!path.contains(&Vector2::new(2, 2)));
     }
 
@@ -334,7 +379,7 @@ mod tests {
             grid,
             NodePickStyle::ALL,
             NodeRadiusSearch {
-                node_radius_search_radius_squared: 1.0,
+                node_radius_search_radius: 1.0,
                 do_absolute_discard: false,
                 avg_distance_min_discard_threshold: 0.5,
                 avg_distance_cost: 1.0,
@@ -344,15 +389,14 @@ mod tests {
         let path = astar.calculate_path(Vector2::new(0, 0), Vector2::new(3, 3));
         assert!(path.is_some());
         let path = path.unwrap();
-        // With diagonal movement, should be a direct diagonal line
-        assert_eq!(path.len(), 4); // Should include start, end, and 2 diagonal moves
+        assert_eq!(path.len(), 4);
     }
 
     #[test]
     fn test_multiple_uncertainty_fields() {
         let mut grid = create_empty_grid();
-        grid.add_uncertenty_field(Vector2::new(2.0, 2.0), 2.0, 10.0);
-        grid.add_uncertenty_field(Vector2::new(3.0, 3.0), 2.0, 10.0);
+        grid.add_uncertainty_field(Vector2::new(2.0, 2.0), 2.0, 10.0);
+        grid.add_uncertainty_field(Vector2::new(3.0, 3.0), 2.0, 10.0);
 
         let astar = AStar::new(grid);
         let path = astar.calculate_path(Vector2::new(0, 0), Vector2::new(5, 5));
@@ -365,7 +409,6 @@ mod tests {
     #[test]
     fn test_path_along_border() {
         let mut grid = create_empty_grid();
-        // Create obstacles forcing path along the border
         for i in 1..9 {
             grid.push_static_obstacle(Vector2::new(1, i));
         }
@@ -374,21 +417,18 @@ mod tests {
         let path = astar.calculate_path(Vector2::new(0, 0), Vector2::new(0, 9));
         assert!(path.is_some());
         let path = path.unwrap();
-        // All x coordinates should be 0
         assert!(path.iter().all(|p| p.x == 0));
     }
 
     #[test]
     fn test_high_intensity_uncertainty() {
         let mut grid = create_empty_grid();
-        // Add a very high intensity uncertainty field
-        grid.add_uncertenty_field(Vector2::new(2.0, 2.0), 2.0, 100.0);
+        grid.add_uncertainty_field(Vector2::new(2.0, 2.0), 2.0, 100.0);
 
         let astar = AStar::new(grid);
         let path = astar.calculate_path(Vector2::new(0, 0), Vector2::new(4, 4));
         assert!(path.is_some());
         let path = path.unwrap();
-        // Path should take a longer route to avoid the high-intensity area
-        assert!(path.len() > 5); // Should take a longer path than direct diagonal
+        assert!(path.len() > 5);
     }
 }

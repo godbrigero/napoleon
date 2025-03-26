@@ -111,7 +111,7 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_addUncerte
     let hybrid_grid = astar.get_grid();
     let field_center: Vector2<f32> =
         jni_util_extended::from_jfloat_array_to_vector2_float(&env, center);
-    hybrid_grid.add_uncertenty_field(field_center, radius, intensity);
+    hybrid_grid.add_uncertainty_field(field_center, radius, intensity);
 }
 
 #[no_mangle]
@@ -166,7 +166,7 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_initialize
         hybrid_grid,
         node_pick_style,
         NodeRadiusSearch {
-            node_radius_search_radius_squared: distance * distance,
+            node_radius_search_radius: distance * distance,
             do_absolute_discard: do_absolute_discard != 0,
             avg_distance_min_discard_threshold: avg_distance_min_discard_threshold as f32,
             avg_distance_cost: avg_distance_cost as f32,
@@ -177,4 +177,27 @@ pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_initialize
     let ptr = Box::into_raw(boxed_astar);
 
     ptr as jlong
+}
+
+#[no_mangle]
+pub extern "system" fn Java_org_pwrup_napoleon_bridge_AStarPathfinder_cleanup<'a>(
+    mut env: JNIEnv<'a>,
+    obj: JClass<'a>,
+) {
+    let ptr = env
+        .get_field(&obj, "nativePtr", "J")
+        .expect("Field not found")
+        .j()
+        .unwrap();
+
+    if ptr != 0 {
+        unsafe {
+            let _boxed: Box<AStar> = Box::from_raw(ptr as *mut AStar);
+            // Dropping the Box here frees memory
+        }
+
+        // Optional: Clear the field
+        env.set_field(obj, "nativePtr", "J", jni::objects::JValue::Long(0))
+            .unwrap();
+    }
 }

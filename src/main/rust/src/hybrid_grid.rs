@@ -7,24 +7,7 @@ use std::{
 use kiddo::{KdTree, NearestNeighbour};
 use nalgebra::{Matrix3, Vector2};
 
-pub mod dynamic_objects;
 pub mod math;
-
-pub trait GenericDynamicObject: Send + Sync {
-    fn calculate_transformation_matrix_at(&self, time: f64) -> Matrix3<f64>;
-}
-
-impl GenericDynamicObject for Box<dyn GenericDynamicObject> {
-    fn calculate_transformation_matrix_at(&self, time: f64) -> Matrix3<f64> {
-        (**self).calculate_transformation_matrix_at(time)
-    }
-}
-
-impl GenericDynamicObject for Arc<dyn GenericDynamicObject> {
-    fn calculate_transformation_matrix_at(&self, time: f64) -> Matrix3<f64> {
-        (**self).calculate_transformation_matrix_at(time)
-    }
-}
 
 #[derive(Clone)]
 pub struct UncertentyField {
@@ -42,10 +25,11 @@ pub struct HybridGrid {
     square_size_meters: f32,
 
     static_obstacles: HashSet<Vector2<i32>>,
+
     hybrid_obstacles: KdTree<f32, 2>,
 
-    uncertenty_defs: HashMap<u64, UncertentyField>,
-    uncertenty_fields: KdTree<f32, 2>,
+    uncertainty_defs: HashMap<u64, UncertentyField>,
+    uncertainty_fields: KdTree<f32, 2>,
     max_field_radius: f32,
 }
 
@@ -65,8 +49,8 @@ impl HybridGrid {
             square_size_meters,
             static_obstacles: HashSet::new(),
             hybrid_obstacles: KdTree::new(),
-            uncertenty_defs: HashMap::new(),
-            uncertenty_fields: KdTree::new(),
+            uncertainty_defs: HashMap::new(),
+            uncertainty_fields: KdTree::new(),
             max_field_radius: 0.0,
         }
     }
@@ -125,7 +109,7 @@ impl HybridGrid {
         self.hybrid_obstacles = KdTree::new()
     }
 
-    pub fn get_nearest(
+    pub fn get_nearest_hybrid(
         &self,
         position: Vector2<i32>,
         dist: f32,
@@ -137,18 +121,6 @@ impl HybridGrid {
                 NonZero::new(10000).unwrap(),
                 false,
             )
-    }
-
-    pub fn is_obstruction_in_radius(&self, position: Vector2<i32>, radius: i32) -> bool {
-        for i in -radius..=radius {
-            for j in -radius..=radius {
-                if self.is_obstructed(position + Vector2::new(i, j)) {
-                    return true;
-                }
-            }
-        }
-
-        false
     }
 
     pub fn get_all_obstructions_in_radius(
@@ -169,15 +141,19 @@ impl HybridGrid {
         obstructions
     }
 
-    pub fn add_uncertenty_field(&mut self, center: Vector2<f32>, radius: f32, intensity: f32) {
-        let position = (self.uncertenty_defs.len() + 1) as u64;
+    pub fn is_obstruction_in_radius(&self, position: Vector2<i32>, radius: i32) -> bool {
+        return self.get_all_obstructions_in_radius(position, radius).len() != 0;
+    }
+
+    pub fn add_uncertainty_field(&mut self, center: Vector2<f32>, radius: f32, intensity: f32) {
+        let position = (self.uncertainty_defs.len() + 1) as u64;
         if radius > self.max_field_radius {
             self.max_field_radius = radius;
         }
 
-        self.uncertenty_fields
+        self.uncertainty_fields
             .add(&[center.x as f32, center.y as f32], position);
-        self.uncertenty_defs.insert(
+        self.uncertainty_defs.insert(
             position,
             UncertentyField {
                 center,
@@ -188,20 +164,23 @@ impl HybridGrid {
     }
 
     pub fn clear_uncertenty_fields(&mut self) {
-        self.uncertenty_defs.clear();
-        self.uncertenty_fields = KdTree::new();
+        self.uncertainty_defs.clear();
+        self.uncertainty_fields = KdTree::new();
     }
 
-    pub fn get_uncertenty_field(&self, position: Vector2<f32>) -> Option<(UncertentyField, f32)> {
+    pub fn get_nearest_uncertainty_field(
+        &self,
+        position: Vector2<f32>,
+    ) -> Option<(UncertentyField, f32)> {
         let output = self
-            .uncertenty_fields
+            .uncertainty_fields
             .nearest_one::<kiddo::SquaredEuclidean>(&[position.x as f32, position.y as f32]);
 
-        if !self.uncertenty_defs.contains_key(&output.item) {
+        if !self.uncertainty_defs.contains_key(&output.item) {
             return None;
         }
 
-        let field = self.uncertenty_defs.get(&output.item).unwrap();
+        let field = self.uncertainty_defs.get(&output.item).unwrap();
 
         if field.radius < output.distance {
             return None;
@@ -259,11 +238,11 @@ mod tests {
         let object = [1.0, 1.0];
 
         grid.add_hybrid_object(&object);
-        let nearest = grid.get_nearest(Vector2::new(1, 1), 10.0);
+        let nearest = grid.get_nearest_hybrid(Vector2::new(1, 1), 10.0);
         assert!(!nearest.is_empty());
 
         grid.clear_hybrid_objects();
-        let nearest_after_clear = grid.get_nearest(Vector2::new(1, 1), 10.0);
+        let nearest_after_clear = grid.get_nearest_hybrid(Vector2::new(1, 1), 10.0);
         assert!(nearest_after_clear.is_empty());
     }
 
@@ -281,8 +260,8 @@ mod tests {
         let mut grid = HybridGrid::new_raw(100, 100, 1.0, 0, 0);
         let center = Vector2::new(1.0, 1.0);
 
-        grid.add_uncertenty_field(center, 2.0, 0.5);
-        let field = grid.get_uncertenty_field(center);
+        grid.add_uncertainty_field(center, 2.0, 0.5);
+        let field = grid.get_nearest_uncertainty_field(center);
 
         assert!(field.is_some());
         let (field, distance) = field.unwrap();
@@ -290,6 +269,6 @@ mod tests {
         assert_eq!(field.intensity, 0.5);
         assert_eq!(distance, 0.0);
         grid.clear_uncertenty_fields();
-        assert!(grid.get_uncertenty_field(center).is_none());
+        assert!(grid.get_nearest_uncertainty_field(center).is_none());
     }
 }

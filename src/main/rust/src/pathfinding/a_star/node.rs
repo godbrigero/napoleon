@@ -37,6 +37,7 @@ impl NodePickStyle {
 pub struct Node {
     position: Vector2<i32>,
     cost: f64,
+    g_score: f64,
     parent: Option<Arc<Node>>,
     time_ms_since_initial: f64,
 }
@@ -56,6 +57,7 @@ impl Node {
         Self {
             position,
             cost: 0.0,
+            g_score: 0.0,
             parent,
             time_ms_since_initial: 0.0,
         }
@@ -91,6 +93,14 @@ impl Node {
 
     pub fn get_cost(&self) -> f64 {
         return self.cost;
+    }
+
+    pub fn set_g_score(&mut self, new_score: f64) {
+        self.g_score = new_score;
+    }
+
+    pub fn get_g_cost(&self) -> f64 {
+        return self.g_score;
     }
 }
 

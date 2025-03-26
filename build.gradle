@@ -44,6 +44,26 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
 }
 
+// Add a specific task to run the pathfinding visualization
+tasks.register('runPathfinder', JavaExec) {
+    group = "application"
+    description = "Runs the A* Pathfinder visualization"
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "org.pwrup.napoleon.Napoleon"
+    
+    // Native libraries are expected to be in these directories
+    systemProperty 'java.library.path', file("$buildDir/native-libs").absolutePath + 
+                                       File.pathSeparator + 
+                                       file("src/main/resources/native").absolutePath
+    
+    doFirst {
+        println "Starting A* Pathfinder visualization..."
+    }
+}
+
+runPathfinder.dependsOn build
+
 tasks.register('buildRust') {
     doLast {
         def rustDir = "$projectDir/src/main/rust"
@@ -117,6 +137,7 @@ tasks.named('build').configure {
     dependsOn buildRust, buildDynamically
 }
 
+
 // Modify the jar task to include both Rust libraries and dynamically built JARs
 jar {
     dependsOn buildRust, buildDynamically
@@ -144,7 +165,8 @@ jar {
 
     manifest {
         attributes(
-            "Main-Class": application.mainClass
+            "Main-Class": application.mainClass,
+            "Pathfinder-Class": "org.pwrup.napoleon.Napoleon"
         )
     }
 }
@@ -154,16 +176,42 @@ tasks.register('runJar', JavaExec) {
     group = "application"
     description = "Builds and runs the compiled JAR."
 
-    // Find the compiled JAR
-    def jarFile = file("$buildDir/libs/${project.name}.jar")
-
-    if (!jarFile.exists()) {
-        throw new GradleException("JAR file not found! Run `./gradlew build` first.")
+    doFirst {
+        // Find the compiled JAR within the doFirst block after build has completed
+        def jarFile = file("$buildDir/libs/${project.name}.jar")
+        
+        if (!jarFile.exists()) {
+            throw new GradleException("JAR file not found! Check the build process.")
+        }
+        
+        println "Running JAR: ${jarFile}"
+        classpath = files(jarFile)
     }
 
-    println "Running JAR: ${jarFile}"
-
     mainClass = "org.pwrup.napoleon.Main" // Change to your main class
-    classpath = files(jarFile)
     args = [] // Add any command-line arguments here if needed
+}
+
+// Add a task to run the pathfinder visualization from the compiled JAR
+tasks.register('runPathfinderJar', JavaExec) {
+    dependsOn build // Ensure the JAR is built first
+    group = "application"
+    description = "Runs the A* Pathfinder visualization from the compiled JAR"
+
+    doFirst {
+        // Find the compiled JAR within the doFirst block after build has completed
+        def jarFile = file("$buildDir/libs/${project.name}.jar")
+        
+        if (!jarFile.exists()) {
+            throw new GradleException("JAR file not found! Check the build process.")
+        }
+        
+        println "Running Pathfinder visualization from JAR: ${jarFile}"
+        classpath = files(jarFile)
+    }
+
+    mainClass = "org.pwrup.napoleon.Napoleon" // Use the Napoleon class directly
+    
+    // Add a system property to enable timing measurements 
+    systemProperty 'pathfinder.timing.enabled', 'true'
 }
